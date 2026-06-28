@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "dcreators-mobile",
-    "slug": "dcreators-mobile",
+    "name": "DChirag",
+    "slug": "DChirag",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -28,7 +28,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "f38a0aeb-adff-458a-bd3a-b5b23a8cdccd"
+        "projectId": "8521d79b-e75e-45b7-a97c-a265bbce6d92"
       }
     },
     "owner": "chiragmtest",
@@ -36,7 +36,7 @@
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/f38a0aeb-adff-458a-bd3a-b5b23a8cdccd"
+      "url": "https://u.expo.dev/8521d79b-e75e-45b7-a97c-a265bbce6d92"
     }
   }
 }

@@ -48,3 +48,9 @@ yarn-error.*
 # one-off refactor / utility scripts (local dev only)
 refactor-*.js
 fix-headers.js
+
+# scripts/ folder — may contain hardcoded credentials or seeding scripts
+scripts/
+
+# Supabase local temp / linked project config
+supabase/.temp/
