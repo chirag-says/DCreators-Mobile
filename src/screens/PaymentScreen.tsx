@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, ImageBackground, TouchableOpacity,
+  View, Text, ScrollView, StyleSheet, TouchableOpacity,
   Platform, Alert, ActivityIndicator, Animated, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,7 +16,6 @@ import { createCashfreeOrder, verifyPaymentStatus } from '../lib/cashfree';
 import { sendNotification } from '../lib/notifications';
 import { useAuthStore } from '../store/useAuthStore';
 import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
-import { RemoteAssets } from '../lib/assets';
 
 
 export default function PaymentScreen({ navigation, route }: any) {
@@ -196,7 +195,7 @@ export default function PaymentScreen({ navigation, route }: any) {
   }
 
   return (
-    <ImageBackground source={{ uri: RemoteAssets.bgTexture }} style={styles.bg} imageStyle={{ opacity: 1 }}>
+    <View style={styles.bg}>
       <SafeAreaView style={styles.safe} edges={['top']}>
         <TopHeader />
 
@@ -414,7 +413,7 @@ export default function PaymentScreen({ navigation, route }: any) {
         </Modal>
 
       </SafeAreaView>
-    </ImageBackground>
+    </View>
   );
 }
 

@@ -1,19 +1,38 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, ImageBackground, TouchableOpacity, TextInput, Platform } from 'react-native';
+﻿import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Platform, Alert, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { User, Camera, ChevronLeft } from 'lucide-react-native';
+import { User, ChevronLeft } from 'lucide-react-native';
+import { useAuthStore } from '../store/useAuthStore';
 import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
-import { RemoteAssets } from '../lib/assets';
 
 
 export default function EditProfileScreen({ navigation }: any) {
-  const [name, setName] = useState('John Doe');
-  const [email, setEmail] = useState('john.doe@example.com');
-  const [bio, setBio] = useState('Creative designer with 5 years experience.');
+  const { profile, user, updateProfile } = useAuthStore();
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (profile) {
+      setName(profile.name || '');
+      setPhone(profile.phone || '');
+      setAddress(profile.address || '');
+    }
+  }, [profile]);
+
+  async function handleSave() {
+    if (!name.trim()) { Alert.alert('Required', 'Please enter your name.'); return; }
+    setIsSaving(true);
+    const result = await updateProfile({ name: name.trim(), phone: phone.trim() || null, address: address.trim() || null });
+    setIsSaving(false);
+    if (result.success) navigation.goBack();
+    else Alert.alert('Error', result.error ?? 'Could not save your profile.');
+  }
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.cardBg }]} edges={['top']}>
-      <ImageBackground source={{ uri: RemoteAssets.bgTexture }} style={styles.bg} imageStyle={{ opacity: 1 }}>
+      <View style={styles.bg}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}><ChevronLeft size={28} color={colors.textPrimary} /></TouchableOpacity>
           <Text style={styles.headerTitle}>Edit Profile</Text>
@@ -23,21 +42,29 @@ export default function EditProfileScreen({ navigation }: any) {
           <View style={styles.container}>
             <View style={styles.avatarSection}>
               <View style={styles.avatarCircle}>
-                <User size={40} color={colors.textTertiary} />
-                <TouchableOpacity style={styles.cameraBtn}><Camera size={16} color={colors.textOnPrimary} /></TouchableOpacity>
+                {profile?.avatar_url
+                  ? <Image source={{ uri: profile.avatar_url }} style={styles.avatarImg} />
+                  : <User size={40} color={colors.textTertiary} />
+                }
               </View>
             </View>
             <View style={styles.formContainer}>
-              <View style={styles.inputGroup}><Text style={styles.label}>Full Name</Text><TextInput style={styles.input} value={name} onChangeText={setName} /></View>
-              <View style={styles.inputGroup}><Text style={styles.label}>Email Address</Text><TextInput style={styles.input} value={email} onChangeText={setEmail} keyboardType="email-address" /></View>
-              <View style={styles.inputGroup}><Text style={styles.label}>Bio / Description</Text><TextInput style={[styles.input, styles.textArea]} value={bio} onChangeText={setBio} multiline textAlignVertical="top" /></View>
+              <View style={styles.inputGroup}><Text style={styles.label}>Full Name</Text><TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Your name" placeholderTextColor={colors.textTertiary} /></View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Email Address</Text>
+                <View style={[styles.input, styles.inputDisabled]}><Text style={styles.inputDisabledText}>{user?.email || profile?.email}</Text></View>
+              </View>
+              <View style={styles.inputGroup}><Text style={styles.label}>Phone</Text><TextInput style={styles.input} value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="Phone number" placeholderTextColor={colors.textTertiary} /></View>
+              <View style={styles.inputGroup}><Text style={styles.label}>Address</Text><TextInput style={[styles.input, styles.textArea]} value={address} onChangeText={setAddress} multiline textAlignVertical="top" placeholder="Your address" placeholderTextColor={colors.textTertiary} /></View>
             </View>
           </View>
         </ScrollView>
         <View style={styles.actionsBar}>
-          <TouchableOpacity style={styles.saveBtn} onPress={() => navigation.goBack()}><Text style={styles.saveBtnText}>Save Changes</Text></TouchableOpacity>
+          <TouchableOpacity style={[styles.saveBtn, isSaving && { opacity: 0.6 }]} onPress={handleSave} disabled={isSaving}>
+            {isSaving ? <ActivityIndicator color={colors.textOnPrimary} /> : <Text style={styles.saveBtnText}>Save Changes</Text>}
+          </TouchableOpacity>
         </View>
-      </ImageBackground>
+      </View>
     </SafeAreaView>
   );
 }
@@ -50,12 +77,14 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: fontSizes.lg, fontWeight: '700', color: colors.textPrimary, fontFamily: fonts.heavy },
   container: { flex: 1, padding: spacing['2xl'] },
   avatarSection: { alignItems: 'center', marginBottom: spacing['3xl'] },
-  avatarCircle: { width: 100, height: 100, borderRadius: 50, backgroundColor: colors.sectionBg, alignItems: 'center', justifyContent: 'center', position: 'relative', borderWidth: 1, borderColor: colors.borderInput },
-  cameraBtn: { position: 'absolute', bottom: 0, right: 0, backgroundColor: colors.primary, width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.cardBg },
+  avatarCircle: { width: 100, height: 100, borderRadius: 50, backgroundColor: colors.sectionBg, alignItems: 'center', justifyContent: 'center', position: 'relative', borderWidth: 1, borderColor: colors.borderInput, overflow: 'hidden' },
+  avatarImg: { width: 100, height: 100, borderRadius: 50 },
   formContainer: { gap: spacing.xl },
   inputGroup: { gap: spacing.sm },
   label: { fontSize: fontSizes.sm, fontWeight: '700', color: colors.textPrimary, fontFamily: fonts.heavy },
   input: { backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.borderInput, borderRadius: radii.md, height: 48, paddingHorizontal: spacing.lg, fontSize: fontSizes.base, fontFamily: fonts.body, color: colors.textPrimary },
+  inputDisabled: { backgroundColor: colors.sectionBg, justifyContent: 'center' },
+  inputDisabledText: { fontSize: fontSizes.base, fontFamily: fonts.body, color: colors.textTertiary },
   textArea: { height: 100, paddingTop: spacing.md },
   actionsBar: { padding: spacing.lg, paddingBottom: Platform.OS === 'ios' ? 34 : spacing.lg, backgroundColor: colors.cardBg, borderTopWidth: 1, borderTopColor: colors.border },
   saveBtn: { backgroundColor: colors.success, paddingVertical: 14, borderRadius: radii.md, alignItems: 'center' },

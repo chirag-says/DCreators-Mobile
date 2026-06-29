@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ImageBackground, TouchableOpacity, TextInput, ScrollView, Platform, Image, ActivityIndicator } from 'react-native';
+﻿import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platform, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search, SlidersHorizontal, ChevronLeft, User } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
@@ -154,11 +154,7 @@ export default function SearchScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: '#FFF' }]} edges={['top']}>
-      <ImageBackground 
-        source={{ uri: RemoteAssets.bgTexture }} 
-        style={styles.backgroundImage}
-        imageStyle={{ opacity: 1 }}
-      >
+      <View style={styles.bg}>
         {/* Search Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -245,7 +241,7 @@ export default function SearchScreen({ navigation }: any) {
 
           </View>
         </ScrollView>
-      </ImageBackground>
+      </View>
     </SafeAreaView>
   );
 }

@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, StyleSheet, ImageBackground, TouchableOpacity, Platform, ActivityIndicator, RefreshControl, Image, Alert } from 'react-native';
+﻿import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Platform, ActivityIndicator, RefreshControl, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Star, Bookmark, Trash2, User, Heart } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -84,11 +84,7 @@ export default function SavedCreatorsScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.cardBg }]} edges={['top']}>
-      <ImageBackground 
-        source={{ uri: RemoteAssets.bgTexture }} 
-        style={styles.backgroundImage}
-        imageStyle={{ opacity: 1 }}
-      >
+      <View style={styles.bg}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <ChevronLeft size={28} color={colors.textPrimary} />
@@ -177,7 +173,7 @@ export default function SavedCreatorsScreen({ navigation }: any) {
           </ScrollView>
         )}
 
-      </ImageBackground>
+      </View>
     </SafeAreaView>
   );
 }

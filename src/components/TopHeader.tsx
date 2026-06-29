@@ -1,10 +1,12 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { View, TouchableOpacity, Image, StyleSheet, Text, Animated, Platform } from 'react-native';
 import { Search, User } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAuthStore } from '../store/useAuthStore';
 import { colors, fonts, fontSizes, spacing, radii } from '../styles/theme';
 import { RemoteAssets } from '../lib/assets';
+import SideMenu from './SideMenu';
+import HamburgerIcon from './HamburgerIcon';
 
 // ─── Design tokens ───────────────────────────────────────────
 const NAVY = '#1B3A5C';
@@ -29,6 +31,7 @@ export default function TopHeader() {
   const setRole = useAuthStore((s) => s.setRole);
   const profile = useAuthStore((s) => s.profile);
   const consultantProfile = useAuthStore((s) => s.consultantProfile);
+  const [menuVisible, setMenuVisible] = useState(false);
 
   // Only show switch if user has a consultant profile
   const canSwitch = !!consultantProfile;
@@ -45,6 +48,17 @@ export default function TopHeader() {
     }).start();
   }, [currentRole]);
 
+  // Hamburger ⇄ X morph: top/bottom lines rotate and slide to center, middle line fades out
+  const morphProgress = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(morphProgress, {
+      toValue: menuVisible ? 1 : 0,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+  }, [menuVisible]);
+
   function toggleRole(role: 'client' | 'consultant') {
     if (role === currentRole) return;
     setRole(role);
@@ -59,12 +73,8 @@ export default function TopHeader() {
     <View style={styles.header}>
       {/* Left: Hamburger + D icon */}
       <View style={styles.leftGroup}>
-        <TouchableOpacity style={styles.hamburger} onPress={() => navigation.navigate('Menu')}>
-          <View style={styles.hamLine} />
-          <View style={styles.hamLine} />
-          <View style={styles.hamLine} />
-        </TouchableOpacity>
-        
+        <HamburgerIcon progress={morphProgress} onPress={() => setMenuVisible((v) => !v)} />
+
         <Image 
           source={{ uri: RemoteAssets.dIcon }} 
           style={styles.logo}
@@ -125,6 +135,13 @@ export default function TopHeader() {
           <User size={20} color={colors.primary} strokeWidth={2.5} />
         </TouchableOpacity>
       </View>
+
+      <SideMenu
+        visible={menuVisible}
+        onClose={() => setMenuVisible(false)}
+        navigation={navigation}
+        progress={morphProgress}
+      />
     </View>
   );
 }
@@ -143,15 +160,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-  },
-  hamburger: {
-    gap: 6,
-  },
-  hamLine: {
-    width: 26,
-    height: 2.5,
-    backgroundColor: colors.primary,
-    borderRadius: 2,
   },
   logo: {
     width: 40,

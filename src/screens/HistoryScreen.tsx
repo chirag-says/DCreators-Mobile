@@ -1,4 +1,4 @@
-/**
+﻿/**
  * HistoryScreen — role-aware project history
  * Matches Figma: "My History Dashboard.png" (consultant variant)
  *
@@ -20,7 +20,6 @@ import {
   RefreshControl,
   ActivityIndicator,
   Platform,
-  ImageBackground,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TopHeader from '../components/TopHeader';
@@ -28,7 +27,6 @@ import { TrendingUp, Palette, PenTool } from 'lucide-react-native';
 import { useAuthStore } from '../store/useAuthStore';
 import { fetchProjectHistory, fetchConsultantEarnings, fetchConsultantReviews } from '../services/projectService';
 import { colors, fonts, fontSizes, spacing, radii } from '../styles/theme';
-import { RemoteAssets } from '../lib/assets';
 import type { Project } from '../types';
 
 // ─── Figma tokens ────────────────────────────────────────────
@@ -104,19 +102,19 @@ export default function HistoryScreen({ navigation }: any) {
 
   if (loading) {
     return (
-      <ImageBackground source={{ uri: RemoteAssets.bgTexture }} style={styles.bg}>
+      <View style={styles.bg}>
         <SafeAreaView style={styles.safe} edges={['top']}>
           <TopHeader />
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
           </View>
         </SafeAreaView>
-      </ImageBackground>
+      </View>
     );
   }
 
   return (
-    <ImageBackground source={{ uri: RemoteAssets.bgTexture }} style={styles.bg} imageStyle={{ opacity: 1 }}>
+    <View style={styles.bg}>
       <SafeAreaView style={styles.safe} edges={['top']}>
         <TopHeader />
         <ScrollView
@@ -257,7 +255,7 @@ export default function HistoryScreen({ navigation }: any) {
           )}
         </ScrollView>
       </SafeAreaView>
-    </ImageBackground>
+    </View>
   );
 }
 

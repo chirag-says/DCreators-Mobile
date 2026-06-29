@@ -15,13 +15,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   MoreVertical, Edit3, ChevronLeft, ChevronRight,
-  Plus, Save, Bell,
+  Plus, Save,
 } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
 import { colors, fonts, fontSizes, spacing, radii } from '../styles/theme';
 import type { Project } from '../types';
-import FigmaBottomBar from '../components/FigmaBottomBar';
+import TopHeader from '../components/TopHeader';
 
 const NAVY   = '#1B3A5C';
 const TEAL   = '#3D9B8F';
@@ -174,13 +174,7 @@ export default function ConsultantProjectManagementScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      <View style={s.header}>
-        <View style={s.backBtn} />
-        <Text style={s.tagline}>HIRE CREATIVES. BUY ART. BUILD IDEAS</Text>
-        <TouchableOpacity style={s.iconBtn} onPress={() => navigation.navigate('Notifications')} activeOpacity={0.7}>
-          <Bell size={18} color={NAVY} />
-        </TouchableOpacity>
-      </View>
+      <TopHeader />
 
       <ScrollView
         contentContainerStyle={s.scroll}
@@ -358,17 +352,12 @@ export default function ConsultantProjectManagementScreen({ navigation }: any) {
         </View>
 
       </ScrollView>
-      <FigmaBottomBar navigation={navigation} activeTab="sales" />
     </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: BG },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
-  backBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  tagline: { fontSize: 9, fontFamily: fonts.body, color: colors.textTertiary, letterSpacing: 0.5 },
-  iconBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   scroll: { paddingHorizontal: 20, paddingBottom: 60 },
   sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12, marginBottom: 14 },
   sectionTitle: { fontSize: fontSizes.xl, fontWeight: '800', fontFamily: fonts.heavy, color: NAVY },

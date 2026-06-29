@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TopHeader from '../components/TopHeader';
-import FigmaBottomBar from '../components/FigmaBottomBar';
 import { supabase } from '../lib/supabase';
 import { updateProjectStatus } from '../services/projectService';
 import { sendNotification } from '../lib/notifications';
@@ -511,8 +510,6 @@ export default function CreatorWorkorderScreen({ navigation, route }: any) {
 
         </ScrollView>
       )}
-
-      <FigmaBottomBar navigation={navigation} activeTab="sales" />
 
       <Modal visible={!!uploadRound} animationType="slide" transparent>
         <View style={styles.modalOverlay}>

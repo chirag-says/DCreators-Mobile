@@ -5,12 +5,12 @@
  * Style: white background, navy active, gray inactive, rounded top border
  *
  * Tab visibility depends on role:
- *   - client:     HOME | SEARCH | ACTIVITY | HISTORY | PROFILE
+ *   - client:     HOME | SEARCH | ACTIVITY | HISTORY | SHOP
  *   - consultant: HOME | SEARCH | BIDS | PROJECTS | SALES
  *
- * Consultant has no PROFILE tab — the avatar in TopHeader already opens
- * their profile directly, so a duplicate tab isn't needed. Service Pricing
- * and Update Portfolio live inside the profile screen / sidebar menu
+ * Neither role has a PROFILE tab — the avatar in TopHeader already opens
+ * the user's own profile directly, so a duplicate tab isn't needed. Service
+ * Pricing and Update Portfolio live inside the profile screen / sidebar menu
  * instead of the bottom nav, since they're occasional edits, not daily use.
  *
  * No BACK tab — native iOS/Android swipe-back gesture (and the hardware/edge
@@ -21,7 +21,7 @@ import {
   View, TouchableOpacity, Text, StyleSheet, Platform, LayoutAnimation, UIManager,
 } from 'react-native';
 import {
-  Home, Search, User, Clock, ClipboardList, FileText, Briefcase, TrendingUp,
+  Home, Search, ShoppingBag, Clock, ClipboardList, FileText, Briefcase, TrendingUp,
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -58,7 +58,7 @@ export default function BottomNavigation({ state, navigation: tabNavigation }: a
     { name: 'Search',    label: 'SEARCH', Icon: Search },
     { name: 'MyActivity', label: 'ACTIVITY', Icon: ClipboardList },
     { name: 'History',   label: 'HISTORY',Icon: Clock },
-    { name: 'EditProfile', label: 'PROFILE', Icon: User },
+    { name: 'Shop',      label: 'SHOP',   Icon: ShoppingBag },
   ];
 
   const consultantTabs: TabDef[] = [

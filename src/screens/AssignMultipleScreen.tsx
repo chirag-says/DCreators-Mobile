@@ -1,19 +1,14 @@
-import React from 'react';
-import { View, Text, ScrollView, StyleSheet, ImageBackground, TouchableOpacity, Platform } from 'react-native';
+﻿import React from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CheckCircle } from 'lucide-react-native';
 import TopHeader from '../components/TopHeader';
 import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
-import { RemoteAssets } from '../lib/assets';
 
 
 export default function AssignMultipleScreen({ navigation }: any) {
   return (
-    <ImageBackground 
-      source={{ uri: RemoteAssets.bgTexture }} 
-      style={styles.backgroundImage}
-      imageStyle={{ opacity: 1 }}
-    >
+    <View style={styles.bg}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <TopHeader />
         
@@ -52,7 +47,7 @@ export default function AssignMultipleScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
 </SafeAreaView>
-    </ImageBackground>
+    </View>
   );
 }
 

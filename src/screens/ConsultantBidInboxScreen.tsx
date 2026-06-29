@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FileText } from 'lucide-react-native';
+import TopHeader from '../components/TopHeader';
 import { useAuthStore } from '../store/useAuthStore';
 import { colors, fonts, fontSizes, radii } from '../styles/theme';
 import {
@@ -96,11 +97,7 @@ export default function ConsultantBidInboxScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      <View style={s.header}>
-        <View style={s.backBtn} />
-        <Text style={s.tagline}>HIRE CREATIVES. BUY ART. BUILD IDEAS</Text>
-        <View style={{ width: 34 }} />
-      </View>
+      <TopHeader />
 
       <ScrollView
         contentContainerStyle={s.scroll}
@@ -174,9 +171,6 @@ export default function ConsultantBidInboxScreen({ navigation }: any) {
 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: BG },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
-  backBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  tagline: { fontSize: 9, fontFamily: fonts.body, color: colors.textTertiary, letterSpacing: 0.5 },
   scroll: { paddingHorizontal: 20, paddingBottom: 50 },
   heroTitle: { fontSize: 28, fontWeight: '900', fontFamily: fonts.heavy, color: NAVY, marginTop: 10, marginBottom: 4 },
   heroSub: { fontSize: fontSizes.sm + 1, fontFamily: fonts.body, color: colors.textSecondary, lineHeight: 20, marginBottom: 20 },

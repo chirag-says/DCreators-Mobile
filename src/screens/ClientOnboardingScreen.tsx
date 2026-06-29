@@ -1,18 +1,13 @@
-import React from 'react';
-import { View, Text, ScrollView, StyleSheet, ImageBackground, TouchableOpacity, TextInput, Platform } from 'react-native';
+﻿import React from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TopHeader from '../components/TopHeader';
 import { colors, fonts, fontSizes, spacing, radii } from '../styles/theme';
-import { RemoteAssets } from '../lib/assets';
 
 
 export default function ClientOnboardingScreen({ navigation }: any) {
   return (
-    <ImageBackground 
-      source={{ uri: RemoteAssets.bgTexture }} 
-      style={styles.backgroundImage}
-      imageStyle={{ opacity: 1 }}
-    >
+    <View style={styles.bg}>
       <SafeAreaView style={styles.safeArea}>
         <TopHeader />
         
@@ -88,7 +83,7 @@ export default function ClientOnboardingScreen({ navigation }: any) {
         </View>
 
       </SafeAreaView>
-    </ImageBackground>
+    </View>
   );
 }
 

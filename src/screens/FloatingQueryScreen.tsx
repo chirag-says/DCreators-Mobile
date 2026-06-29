@@ -1,12 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, ImageBackground, TouchableOpacity, TextInput, Platform, Alert, ActivityIndicator, Modal } from 'react-native';
+﻿import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Platform, Alert, ActivityIndicator, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Send, X, ChevronDown, Clock, MessageSquare, Plus } from 'lucide-react-native';
 import TopHeader from '../components/TopHeader';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
 import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
-import { RemoteAssets } from '../lib/assets';
 
 
 const DISCIPLINES = ['Photography', 'Design', 'Videography', 'Sculpture', 'Artisan', 'Other'];
@@ -98,7 +97,7 @@ export default function FloatingQueryScreen({ navigation }: any) {
   }
 
   return (
-    <ImageBackground source={{ uri: RemoteAssets.bgTexture }} style={styles.bg} imageStyle={{ opacity: 1 }}>
+    <View style={styles.bg}>
       <SafeAreaView style={styles.safe} edges={['top']}>
         <TopHeader />
 
@@ -256,7 +255,7 @@ export default function FloatingQueryScreen({ navigation }: any) {
           </View>
         </ScrollView>
       </SafeAreaView>
-    </ImageBackground>
+    </View>
   );
 }
 

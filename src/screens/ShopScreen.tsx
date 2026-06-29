@@ -58,7 +58,7 @@ export default function ShopScreen({ navigation }: any) {
   });
 
   return (
-    <ImageBackground source={{ uri: RemoteAssets.bgTexture }} style={styles.bg} imageStyle={{ opacity: 1 }}>
+    <View style={styles.bg}>
       <SafeAreaView style={styles.safe} edges={['top']}>
 
         {/* Header */}
@@ -171,7 +171,7 @@ export default function ShopScreen({ navigation }: any) {
           </View>
         </ScrollView>
       </SafeAreaView>
-    </ImageBackground>
+    </View>
   );
 }
 

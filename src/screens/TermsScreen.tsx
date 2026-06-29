@@ -1,20 +1,15 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, ImageBackground, TouchableOpacity, Platform } from 'react-native';
+﻿import React, { useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TopHeader from '../components/TopHeader';
 import { colors, fonts, fontSizes, spacing, radii } from '../styles/theme';
-import { RemoteAssets } from '../lib/assets';
 
 
 export default function TermsScreen({ navigation }: any) {
   const [accepted, setAccepted] = useState(false);
 
   return (
-    <ImageBackground 
-      source={{ uri: RemoteAssets.bgTexture }} 
-      style={styles.backgroundImage}
-      imageStyle={{ opacity: 1 }}
-    >
+    <View style={styles.bg}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <TopHeader />
         
@@ -59,7 +54,7 @@ export default function TermsScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
       </SafeAreaView>
-    </ImageBackground>
+    </View>
   );
 }
 

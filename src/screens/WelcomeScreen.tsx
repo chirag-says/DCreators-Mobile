@@ -26,23 +26,39 @@ import {
   TouchableOpacity,
   StyleSheet,
   Image,
+  Platform,
   useWindowDimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts, spacing, radii } from '../styles/theme';
 import { RemoteAssets } from '../lib/assets';
 
-/** Design was sized for a ~760pt-tall screen; shrink everything below that, never grow it. */
+/** Design was sized for a ~760pt *usable* (safe-area-excluded) height; shrink everything below that, never grow it. */
 const BASE_HEIGHT = 760;
+
+/**
+ * Some Android OEM skins (MIUI, etc.) report `insets.bottom` as 0 even when a
+ * 3-button nav bar is on screen, so SafeAreaView's own bottom padding can't be
+ * trusted there. Floor it at a typical 3-button nav bar height instead of
+ * trusting a possibly-wrong 0.
+ */
+const ANDROID_NAV_BAR_FLOOR = 48;
 
 export default function WelcomeScreen({ navigation }: any) {
   const { width, height } = useWindowDimensions();
-  const scale = Math.min(1, height / BASE_HEIGHT);
+  const insets = useSafeAreaInsets();
+  const bottomInset =
+    Platform.OS === 'android' ? Math.max(insets.bottom, ANDROID_NAV_BAR_FLOOR) : insets.bottom;
+  // On Android (3-button/gesture nav), window height includes the system
+  // nav bar — subtract the (possibly-corrected) inset so scale reflects the
+  // height actually visible above it, not the full (unusable) screen height.
+  const usableHeight = height - insets.top - bottomInset;
+  const scale = Math.min(1, usableHeight / BASE_HEIGHT);
   const s = (value: number) => value * scale;
 
   return (
-    <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
-      <View style={[styles.content, { paddingVertical: s(spacing.xl) }]}>
+    <SafeAreaView style={styles.root} edges={['top']}>
+      <View style={[styles.content, { paddingVertical: s(spacing.xl), paddingBottom: bottomInset }]}>
         {/* ── Main stack (tight, natural spacing) ──────── */}
         <View>
           {/* Logo + tagline */}

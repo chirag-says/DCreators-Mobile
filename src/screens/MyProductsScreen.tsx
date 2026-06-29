@@ -1,11 +1,10 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ImageBackground, Platform, ActivityIndicator, RefreshControl, Image, Alert } from 'react-native';
+﻿import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Platform, ActivityIndicator, RefreshControl, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Plus, Package, Edit3, Trash2, Eye, EyeOff } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
 import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
-import { RemoteAssets } from '../lib/assets';
 
 
 export default function MyProductsScreen({ navigation }: any) {
@@ -92,7 +91,7 @@ export default function MyProductsScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.cardBg }]} edges={['top']}>
-      <ImageBackground source={{ uri: RemoteAssets.bgTexture }} style={styles.bg} imageStyle={{ opacity: 1 }}>
+      <View style={styles.bg}>
 
         {/* Header */}
         <View style={styles.header}>
@@ -186,7 +185,7 @@ export default function MyProductsScreen({ navigation }: any) {
             ))}
           </ScrollView>
         )}
-      </ImageBackground>
+      </View>
     </SafeAreaView>
   );
 }

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ImageBackground, Image, ScrollView, Dimensions, TouchableOpacity, Platform } from 'react-native';
+﻿import React, { useState } from 'react';
+import { View, Text, StyleSheet, Image, ScrollView, Dimensions, TouchableOpacity, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import TopHeader from '../components/TopHeader';
@@ -68,7 +68,7 @@ export default function CreatorProfileScreen({ route, navigation }: any) {
     : portfolioKeys.map((key: string) => AVATAR_IMAGES[key] || AVATAR_IMAGES.photographer);
 
   return (
-    <ImageBackground source={{ uri: RemoteAssets.bgTexture }} style={styles.bg} imageStyle={{ opacity: 1 }}>
+    <View style={styles.bg}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <TopHeader />
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} bounces={false}>
@@ -151,7 +151,7 @@ export default function CreatorProfileScreen({ route, navigation }: any) {
 
         </ScrollView>
       </SafeAreaView>
-    </ImageBackground>
+    </View>
   );
 }
 

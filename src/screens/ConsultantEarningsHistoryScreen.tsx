@@ -13,7 +13,8 @@ import {
   Image, ActivityIndicator, RefreshControl, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { TrendingUp, ShoppingBag, Briefcase, Star, Bell } from 'lucide-react-native';
+import { TrendingUp, ShoppingBag, Briefcase, Star } from 'lucide-react-native';
+import TopHeader from '../components/TopHeader';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
 import { colors, fonts, fontSizes, spacing, radii } from '../styles/theme';
@@ -27,7 +28,6 @@ type Tab = 'sales' | 'projects';
 
 export default function ConsultantEarningsHistoryScreen({ navigation }: any) {
   const consultantProfile = useAuthStore(s => s.consultantProfile);
-  const profile           = useAuthStore(s => s.profile);
 
   const [tab,       setTab]       = useState<Tab>('sales');
   const [sales,     setSales]     = useState<any[]>([]);
@@ -93,19 +93,7 @@ export default function ConsultantEarningsHistoryScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      {/* ── Header ── */}
-      <View style={s.header}>
-        <View style={s.backBtn} />
-        <View style={s.headerActions}>
-          <TouchableOpacity style={s.iconBtn} onPress={() => navigation.navigate('Notifications')} activeOpacity={0.7}>
-            <Bell size={18} color={NAVY} />
-          </TouchableOpacity>
-          {profile?.avatar_url
-            ? <Image source={{ uri: profile.avatar_url }} style={s.avatar} />
-            : <View style={[s.avatar, s.avatarFallback]}><Text style={s.avatarInit}>{(profile?.name ?? 'A').charAt(0).toUpperCase()}</Text></View>
-          }
-        </View>
-      </View>
+      <TopHeader />
 
       <ScrollView
         contentContainerStyle={s.scroll}
@@ -266,13 +254,6 @@ export default function ConsultantEarningsHistoryScreen({ navigation }: any) {
 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: BG },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4 },
-  backBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  iconBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  avatar: { width: 38, height: 38, borderRadius: 19 },
-  avatarFallback: { backgroundColor: TEAL, alignItems: 'center', justifyContent: 'center' },
-  avatarInit: { fontSize: 15, fontWeight: '800', color: '#fff', fontFamily: fonts.heavy },
   scroll: { paddingHorizontal: 20, paddingBottom: 40 },
   heroTitle: { fontSize: 40, fontWeight: '900', fontFamily: fonts.heavy, color: NAVY, marginTop: 14, marginBottom: 10, lineHeight: 44 },
   heroSub: { fontSize: fontSizes.base, fontFamily: fonts.body, color: colors.textSecondary, lineHeight: 22, marginBottom: 20 },

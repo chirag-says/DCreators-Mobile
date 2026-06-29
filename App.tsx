@@ -42,7 +42,6 @@ import SavedCreatorsScreen from './src/screens/SavedCreatorsScreen';
 import RatingReviewScreen from './src/screens/RatingReviewScreen';
 import ShopScreen from './src/screens/ShopScreen';
 import ProductDetailsScreen from './src/screens/ProductDetailsScreen';
-import MenuScreen from './src/screens/MenuScreen';
 import MessagesListScreen from './src/screens/MessagesListScreen';
 import EditConsultantProfileScreen from './src/screens/EditConsultantProfileScreen';
 import MyProductsScreen from './src/screens/MyProductsScreen';
@@ -192,7 +191,6 @@ export default function App() {
           <Stack.Screen name="RatingReview" component={RatingReviewScreen} />
           <Stack.Screen name="Shop" component={ShopScreen} />
           <Stack.Screen name="ProductDetails" component={ProductDetailsScreen} />
-          <Stack.Screen name="Menu" component={MenuScreen} options={{ animation: 'slide_from_left' }} />
           <Stack.Screen name="MessagesList" component={MessagesListScreen} />
           <Stack.Screen name="MyProducts" component={MyProductsScreen} />
           <Stack.Screen name="AddEditProduct" component={AddEditProductScreen} />

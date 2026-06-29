@@ -109,7 +109,6 @@ export type RootStackParamList = {
   RatingReview: { project: Project };
   Shop: undefined;
   ProductDetails: { product: ShopProduct & { consultant_profiles?: { display_name: string; code: string } } };
-  Menu: undefined;
   MessagesList: undefined;
   MyProducts: undefined;
   AddEditProduct: { product?: ShopProduct } | undefined;

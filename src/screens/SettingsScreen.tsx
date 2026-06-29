@@ -1,11 +1,10 @@
-import React from 'react';
-import { View, Text, ScrollView, StyleSheet, ImageBackground, TouchableOpacity, Switch, Platform } from 'react-native';
+﻿import React from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Switch, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { User, Bell, Shield, HelpCircle, LogOut, ChevronRight, ChevronLeft } from 'lucide-react-native';
 import TopHeader from '../components/TopHeader';
 import { useAuthStore } from '../store/useAuthStore';
 import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
-import { RemoteAssets } from '../lib/assets';
 
 
 export default function SettingsScreen({ navigation }: any) {
@@ -21,11 +20,7 @@ export default function SettingsScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.cardBg }]} edges={['top']}>
-      <ImageBackground 
-        source={{ uri: RemoteAssets.bgTexture }} 
-        style={styles.backgroundImage}
-        imageStyle={{ opacity: 1 }}
-      >
+      <View style={styles.bg}>
       
         
         <View style={styles.header}>
@@ -110,7 +105,7 @@ export default function SettingsScreen({ navigation }: any) {
           </View>
         </ScrollView>
 
-              </ImageBackground>
+              </View>
     </SafeAreaView>
   );
 }

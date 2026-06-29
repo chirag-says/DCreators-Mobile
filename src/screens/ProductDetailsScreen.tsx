@@ -1,9 +1,8 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, ImageBackground, TouchableOpacity, Platform, Dimensions, Image } from 'react-native';
+﻿import React, { useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Platform, Dimensions, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Share2, Heart, ShoppingBag, CheckCircle, ShieldCheck, ChevronRight } from 'lucide-react-native';
 import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
-import { RemoteAssets } from '../lib/assets';
 
 
 const { width } = Dimensions.get('window');
@@ -23,7 +22,7 @@ export default function ProductDetailsScreen({ navigation, route }: any) {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.cardBg }]} edges={['top']}>
-      <ImageBackground source={{ uri: RemoteAssets.bgTexture }} style={styles.bg} imageStyle={{ opacity: 1 }}>
+      <View style={styles.bg}>
 
         {/* Header */}
         <View style={styles.header}>
@@ -116,7 +115,7 @@ export default function ProductDetailsScreen({ navigation, route }: any) {
           </TouchableOpacity>
         </View>
 
-      </ImageBackground>
+      </View>
     </SafeAreaView>
   );
 }

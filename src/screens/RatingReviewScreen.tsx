@@ -1,12 +1,11 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, ImageBackground, TouchableOpacity, TextInput, Platform, Alert, ActivityIndicator } from 'react-native';
+﻿import React, { useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Platform, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Star, Send } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
 import { sendNotification } from '../lib/notifications';
 import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
-import { RemoteAssets } from '../lib/assets';
 
 
 const QUICK_TAGS = ['Professional', 'On Time', 'Creative', 'Responsive', 'Great Value', 'Would Rehire'];
@@ -91,7 +90,7 @@ export default function RatingReviewScreen({ navigation, route }: any) {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.cardBg }]} edges={['top']}>
-      <ImageBackground source={{ uri: RemoteAssets.bgTexture }} style={styles.bg} imageStyle={{ opacity: 1 }}>
+      <View style={styles.bg}>
 
         {/* Header */}
         <View style={styles.header}>
@@ -194,7 +193,7 @@ export default function RatingReviewScreen({ navigation, route }: any) {
           </TouchableOpacity>
         </View>
 
-      </ImageBackground>
+      </View>
     </SafeAreaView>
   );
 }

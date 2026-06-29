@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, ImageBackground, TouchableOpacity, TextInput, Platform, Image, Alert, ActivityIndicator } from 'react-native';
+﻿import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Platform, Image, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TopHeader from '../components/TopHeader';
 import { supabase } from '../lib/supabase';
@@ -7,7 +7,6 @@ import { updateProjectStatus } from '../services/projectService';
 import { sendNotification } from '../lib/notifications';
 import { ArrowLeft, Check, RotateCcw, Pause, X, MessageSquare } from 'lucide-react-native';
 import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
-import { RemoteAssets } from '../lib/assets';
 
 // Next status per round when client approves
 const APPROVE_NEXT: Record<string, string> = {
@@ -155,7 +154,7 @@ export default function ClientReviewScreen({ navigation, route }: any) {
   const files = submission?.files || [];
 
   return (
-    <ImageBackground source={{ uri: RemoteAssets.bgTexture }} style={styles.bg} imageStyle={{ opacity: 1 }}>
+    <View style={styles.bg}>
       <SafeAreaView style={styles.safe} edges={['top']}>
         <TopHeader />
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
@@ -312,7 +311,7 @@ export default function ClientReviewScreen({ navigation, route }: any) {
           </View>
         )}
       </SafeAreaView>
-    </ImageBackground>
+    </View>
   );
 }
 

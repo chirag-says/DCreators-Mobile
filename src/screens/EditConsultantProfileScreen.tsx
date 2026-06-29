@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity, Platform,
-  ScrollView, ImageBackground, Image, Alert, ActivityIndicator,
+  ScrollView, Image, Alert, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TopHeader from '../components/TopHeader';
@@ -10,7 +10,6 @@ import { useAuthStore } from '../store/useAuthStore';
 import { supabase } from '../lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
-import { RemoteAssets } from '../lib/assets';
 
 
 const CATEGORIES = [
@@ -215,7 +214,7 @@ export default function EditConsultantProfileScreen({ navigation }: any) {
   }
 
   return (
-    <ImageBackground source={{ uri: RemoteAssets.bgTexture }} style={styles.bg} resizeMode="cover">
+    <View style={styles.bg}>
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
         <TopHeader />
 
@@ -426,7 +425,7 @@ export default function EditConsultantProfileScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
       </SafeAreaView>
-    </ImageBackground>
+    </View>
   );
 }
 

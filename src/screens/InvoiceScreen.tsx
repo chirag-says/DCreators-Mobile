@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, ImageBackground, TouchableOpacity, Platform, ActivityIndicator } from 'react-native';
+﻿import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Download, FileText } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
 import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
-import { RemoteAssets } from '../lib/assets';
 
 
 export default function InvoiceScreen({ navigation, route }: any) {
@@ -52,11 +51,7 @@ export default function InvoiceScreen({ navigation, route }: any) {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.cardBg }]} edges={['top']}>
-      <ImageBackground
-        source={{ uri: RemoteAssets.bgTexture }}
-        style={styles.backgroundImage}
-        imageStyle={{ opacity: 1 }}
-      >
+      <View style={styles.bg}>
 
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -172,7 +167,7 @@ export default function InvoiceScreen({ navigation, route }: any) {
           </ScrollView>
         )}
 
-      </ImageBackground>
+      </View>
     </SafeAreaView>
   );
 }

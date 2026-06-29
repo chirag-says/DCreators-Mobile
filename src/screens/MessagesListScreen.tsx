@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, Platform, FlatList, ActivityIndicator, RefreshControl, Image } from 'react-native';
+﻿import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, FlatList, ActivityIndicator, RefreshControl, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Search, MessageSquare, User } from 'lucide-react-native';
 import { supabase } from '../lib/supabase';
@@ -170,11 +170,7 @@ export default function MessagesListScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.cardBg }]} edges={['top']}>
-      <ImageBackground 
-        source={{ uri: RemoteAssets.bgTexture }} 
-        style={styles.backgroundImage}
-        imageStyle={{ opacity: 1 }}
-      >
+      <View style={styles.bg}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <ChevronLeft size={28} color={colors.textPrimary} />
@@ -203,7 +199,7 @@ export default function MessagesListScreen({ navigation }: any) {
           />
         )}
 
-      </ImageBackground>
+      </View>
     </SafeAreaView>
   );
 }

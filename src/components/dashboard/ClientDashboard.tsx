@@ -1,4 +1,4 @@
-// ============================================
+﻿// ============================================
 // ClientDashboard — "Explore Creative Consultant's Portfolio"
 // Role: CLIENT | Figma: "Explore Creative Consultant's Portfolio.png"
 // 5 creator browse sections + active projects summary
@@ -11,7 +11,6 @@ import {
   Image,
   ScrollView,
   StyleSheet,
-  ImageBackground,
   RefreshControl,
   TouchableOpacity,
 } from 'react-native';
@@ -23,7 +22,6 @@ import FeaturedCreatorCard from './FeaturedCreatorCard';
 import { useCreators } from '../../hooks/useCreators';
 import { colors, fonts, fontSizes, spacing, radii } from '../../styles/theme';
 import type { CreatorCardViewModel, MainTabScreenProps } from '../../types/navigation';
-import { RemoteAssets } from '../../lib/assets';
 
 // ─── Figma color tokens ──────────────────────────────────────
 const NAVY = '#1B3A5C';
@@ -76,7 +74,7 @@ export default function ClientDashboard({ navigation }: ClientDashboardProps) {
 
 
   return (
-    <ImageBackground source={{ uri: RemoteAssets.bgTexture }} style={styles.bg} imageStyle={{ opacity: 1 }}>
+    <View style={styles.bg}>
       <SafeAreaView style={styles.safe} edges={['top']}>
         <TopHeader />
         <ScrollView
@@ -177,7 +175,7 @@ export default function ClientDashboard({ navigation }: ClientDashboardProps) {
           </View>
         </ScrollView>
       </SafeAreaView>
-    </ImageBackground>
+    </View>
   );
 }
 

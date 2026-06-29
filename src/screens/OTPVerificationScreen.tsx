@@ -1,11 +1,28 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ImageBackground, Platform, KeyboardAvoidingView, Alert, ActivityIndicator } from 'react-native';
+﻿import React, { useState, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  Platform,
+  KeyboardAvoidingView,
+  Alert,
+  ActivityIndicator,
+  Dimensions,
+  ScrollView,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft } from 'lucide-react-native';
 import { useAuthStore } from '../store/useAuthStore';
 import { colors, fonts, fontSizes, spacing, radii } from '../styles/theme';
-import { RemoteAssets } from '../lib/assets';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+// Responsive OTP box: 8 boxes + 7 gaps, within horizontal padding
+const H_PADDING = spacing['2xl'] * 2; // left + right content padding
+const OTP_GAP = 6;
+const OTP_BOX_SIZE = Math.floor((SCREEN_WIDTH - H_PADDING - OTP_GAP * 7) / 8);
 
 export default function OTPVerificationScreen({ navigation, route }: any) {
   const email = route?.params?.email || '';
@@ -79,88 +96,91 @@ export default function OTPVerificationScreen({ navigation, route }: any) {
   }
 
   return (
-    <ImageBackground 
-      source={{ uri: RemoteAssets.bgTexture }} 
-      style={styles.backgroundImage}
-      imageStyle={{ opacity: 1 }}
-    >
+    <View style={styles.bg}>
       <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.container}
         >
-          {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-              <ChevronLeft size={28} color={colors.textPrimary} />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.content}>
-            <Text style={styles.title}>Verify your email</Text>
-            <Text style={styles.subtitle}>
-              We've sent a verification code to{'\n'}
-              <Text style={{ fontWeight: '700', color: colors.textPrimary }}>{email}</Text>
-            </Text>
-
-            {/* OTP Inputs */}
-            <View style={styles.inputSection}>
-              <Text style={styles.label}>Enter OTP</Text>
-              <View style={styles.otpContainer}>
-                {[0, 1, 2, 3, 4, 5, 6, 7].map((index) => (
-                  <TextInput
-                    key={index}
-                    ref={(ref) => { inputRefs.current[index] = ref; }}
-                    style={[
-                      styles.otpInput,
-                      otp[index] ? styles.otpInputFilled : null,
-                    ]}
-                    keyboardType="number-pad"
-                    maxLength={1}
-                    value={otp[index]}
-                    onChangeText={(val) => handleOTPChange(val, index)}
-                    onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, index)}
-                    textAlign="center"
-                    autoFocus={index === 0}
-                  />
-                ))}
-              </View>
-
-              {/* Resend OTP */}
-              <TouchableOpacity 
-                style={styles.resendBtn} 
-                onPress={handleResendOTP}
-                disabled={isLoading || resendCount >= 3}
-              >
-                <Text style={[
-                  styles.resendText,
-                  resendCount >= 3 && { color: colors.textTertiary },
-                ]}>
-                  {resendCount >= 3 ? 'Max attempts reached' : `Resend OTP${resendCount > 0 ? ` (${3 - resendCount} left)` : ''}`}
-                </Text>
-              </TouchableOpacity>
-
-              {/* Verify Button */}
-              <TouchableOpacity 
-                style={[
-                  styles.primaryBtn,
-                  (!canVerify || isLoading) && styles.disabledBtn,
-                ]} 
-                onPress={handleVerify}
-                disabled={!canVerify || isLoading}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color={colors.textOnPrimary} />
-                ) : (
-                  <Text style={styles.primaryBtnText}>Verify & Proceed</Text>
-                )}
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Header */}
+            <View style={styles.header}>
+              <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                <ChevronLeft size={28} color={colors.textPrimary} />
               </TouchableOpacity>
             </View>
 
-          </View>
+            <View style={styles.content}>
+              <Text style={styles.title}>Verify your email</Text>
+              <Text style={styles.subtitle}>
+                {"We've sent a verification code to\n"}
+                <Text style={styles.emailHighlight}>{email}</Text>
+              </Text>
+
+              {/* OTP Inputs */}
+              <View style={styles.inputSection}>
+                <Text style={styles.label}>Enter OTP</Text>
+                <View style={styles.otpContainer}>
+                  {[0, 1, 2, 3, 4, 5, 6, 7].map((index) => (
+                    <TextInput
+                      key={index}
+                      ref={(ref) => { inputRefs.current[index] = ref; }}
+                      style={[
+                        styles.otpInput,
+                        otp[index] ? styles.otpInputFilled : null,
+                      ]}
+                      keyboardType="number-pad"
+                      maxLength={1}
+                      value={otp[index]}
+                      onChangeText={(val) => handleOTPChange(val, index)}
+                      onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, index)}
+                      textAlign="center"
+                      autoFocus={index === 0}
+                    />
+                  ))}
+                </View>
+
+                {/* Resend OTP */}
+                <TouchableOpacity
+                  style={styles.resendBtn}
+                  onPress={handleResendOTP}
+                  disabled={isLoading || resendCount >= 3}
+                >
+                  <Text style={[
+                    styles.resendText,
+                    resendCount >= 3 && { color: colors.textTertiary },
+                  ]}>
+                    {resendCount >= 3
+                      ? 'Max attempts reached'
+                      : `Resend OTP${resendCount > 0 ? ` (${3 - resendCount} left)` : ''}`}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Verify Button */}
+                <TouchableOpacity
+                  style={[
+                    styles.primaryBtn,
+                    (!canVerify || isLoading) && styles.disabledBtn,
+                  ]}
+                  onPress={handleVerify}
+                  disabled={!canVerify || isLoading}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator color={colors.textOnPrimary} />
+                  ) : (
+                    <Text style={styles.primaryBtnText}>Verify & Proceed</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </ImageBackground>
+    </View>
   );
 }
 
@@ -168,7 +188,11 @@ const styles = StyleSheet.create({
   backgroundImage: { flex: 1, backgroundColor: colors.screenBg },
   safeArea: { flex: 1 },
   container: { flex: 1 },
-  
+
+  scrollContent: {
+    flexGrow: 1,
+  },
+
   header: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
@@ -182,21 +206,27 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: spacing['2xl'],
-    paddingTop: spacing['4xl'],
+    paddingTop: Platform.OS === 'android' ? spacing['2xl'] : spacing['4xl'],
   },
   title: {
     fontSize: fontSizes['3xl'],
-    fontWeight: '700',
-    color: colors.primary,
     fontFamily: fonts.heavy,
+    color: colors.primary,
     marginBottom: spacing.sm,
+    // Android: fontWeight must NOT be combined with a custom fontFamily
+    ...(Platform.OS === 'ios' ? { fontWeight: '700' } : {}),
   },
   subtitle: {
     fontSize: fontSizes.base,
     color: colors.textSecondary,
     fontFamily: fonts.body,
-    marginBottom: spacing['4xl'],
-    lineHeight: 20,
+    marginBottom: spacing['3xl'],
+    lineHeight: 22,
+  },
+  emailHighlight: {
+    fontFamily: fonts.heavy,
+    color: colors.textPrimary,
+    ...(Platform.OS === 'ios' ? { fontWeight: '700' } : {}),
   },
 
   inputSection: {
@@ -204,47 +234,52 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: fontSizes.sm,
-    fontWeight: '700',
-    color: colors.textPrimary,
     fontFamily: fonts.medium,
+    color: colors.textPrimary,
     marginBottom: spacing.md,
+    ...(Platform.OS === 'ios' ? { fontWeight: '700' } : {}),
   },
 
   otpContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: spacing.lg,
+    gap: OTP_GAP,
   },
   otpInput: {
-    width: 38,
-    height: 48,
+    width: OTP_BOX_SIZE,
+    height: OTP_BOX_SIZE + 4, // slightly taller than wide for a nice aspect ratio
     backgroundColor: colors.cardBg,
     borderWidth: 1.5,
     borderColor: colors.borderInput,
     borderRadius: radii.sm,
-    fontSize: fontSizes['2xl'],
-    fontWeight: '700',
+    fontSize: fontSizes.xl,
     color: colors.textPrimary,
     fontFamily: fonts.medium,
+    // Prevent Android from adding extra padding inside the text input
+    includeFontPadding: false,
+    paddingVertical: 0,
   },
   otpInputFilled: {
     borderColor: colors.primary,
     backgroundColor: '#EEF2FF',
   },
+
   resendBtn: {
     alignSelf: 'flex-end',
     marginBottom: spacing['2xl'],
+    paddingVertical: spacing.xs,
   },
   resendText: {
     fontSize: fontSizes.sm,
     color: colors.primary,
-    fontWeight: '600',
     fontFamily: fonts.medium,
+    ...(Platform.OS === 'ios' ? { fontWeight: '600' } : {}),
   },
 
   primaryBtn: {
     backgroundColor: colors.primary,
-    height: 50,
+    height: 52,
     borderRadius: radii.full,
     justifyContent: 'center',
     alignItems: 'center',
@@ -255,7 +290,7 @@ const styles = StyleSheet.create({
   primaryBtnText: {
     color: colors.textOnPrimary,
     fontSize: fontSizes.base,
-    fontWeight: '700',
     fontFamily: fonts.medium,
+    ...(Platform.OS === 'ios' ? { fontWeight: '700' } : {}),
   },
 });

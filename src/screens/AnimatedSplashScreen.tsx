@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Animated, StyleSheet, ImageBackground } from 'react-native';
+import { View, Animated, StyleSheet } from 'react-native';
 import { RemoteAssets } from '../lib/assets';
 
 
@@ -29,12 +29,7 @@ export default function AnimatedSplashScreen({ navigation }: any) {
   }, []);
 
   return (
-    <ImageBackground
-      source={{ uri: RemoteAssets.bgTexture }}
-      style={styles.container}
-      imageStyle={{ opacity: 1 }}
-      resizeMode="cover"
-    >
+    <View style={styles.container}>
       <Animated.Image
         source={{ uri: RemoteAssets.dcreatorsLogo }}
         style={[
@@ -46,7 +41,7 @@ export default function AnimatedSplashScreen({ navigation }: any) {
         ]}
         resizeMode="contain"
       />
-    </ImageBackground>
+    </View>
   );
 }
 
