@@ -1,10 +1,16 @@
 ﻿import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Platform, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, Platform, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, CheckCircle, FileText, ChevronLeft, Trash2, CreditCard, AlertCircle, Inbox } from 'lucide-react-native';
-import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
 import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
+import {
+  fetchNotifications as fetchNotificationsService,
+  markNotificationRead,
+  markAllNotificationsRead,
+  clearAllNotifications,
+} from '../lib/notifications';
+import type { Notification } from '../types';
 
 
 const ICON_MAP: Record<string, { icon: any; color: string }> = {
@@ -14,47 +20,86 @@ const ICON_MAP: Record<string, { icon: any; color: string }> = {
   system: { icon: Bell, color: colors.info },
 };
 
+function timeAgo(dateStr: string) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+}
+
+const NotificationRow = React.memo(function NotificationRow({
+  notif,
+  onPress,
+}: {
+  notif: Notification;
+  onPress: (id: string) => void;
+}) {
+  const cfg = ICON_MAP[notif.type] || ICON_MAP.system;
+  const Icon = cfg.icon;
+  return (
+    <TouchableOpacity
+      style={[styles.notifCard, !notif.is_read && styles.notifCardUnread]}
+      onPress={() => onPress(notif.id)}
+      activeOpacity={0.7}
+    >
+      <View style={[styles.iconContainer, { backgroundColor: `${cfg.color}18` }]}>
+        <Icon size={22} color={cfg.color} />
+      </View>
+      <View style={styles.textContainer}>
+        <View style={styles.titleRow}>
+          <Text style={[styles.title, !notif.is_read && styles.titleUnread]} numberOfLines={1}>
+            {notif.title}
+          </Text>
+          {!notif.is_read && <View style={styles.unreadDot} />}
+        </View>
+        <Text style={styles.desc} numberOfLines={2}>{notif.message}</Text>
+        <Text style={styles.time}>{timeAgo(notif.created_at)}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
 export default function NotificationsScreen({ navigation }: any) {
   const profile = useAuthStore((s) => s.profile);
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => { fetchNotifications(); }, []);
-
-  async function fetchNotifications() {
+  const loadNotifications = useCallback(async () => {
     if (!profile?.id) {
       setLoading(false);
       return;
     }
     try {
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', profile.id)
-        .order('created_at', { ascending: false })
-        .limit(30);
-      if (!error && data) setNotifications(data);
+      const data = await fetchNotificationsService(profile.id);
+      setNotifications(data);
     } catch {}
     finally { setLoading(false); setRefreshing(false); }
-  }
+  }, [profile?.id]);
+
+  useEffect(() => { loadNotifications(); }, [loadNotifications]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchNotifications();
-  }, []);
+    loadNotifications();
+  }, [loadNotifications]);
 
   async function markAllRead() {
     if (!profile?.id || notifications.length === 0) return;
     try {
-      await supabase.from('notifications').update({ is_read: true }).eq('user_id', profile.id).eq('is_read', false);
+      await markAllNotificationsRead(profile.id);
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
     } catch {}
   }
 
   async function markRead(id: string) {
     try {
-      await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+      await markNotificationRead(id);
       setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, is_read: true } : n));
     } catch {}
   }
@@ -62,21 +107,9 @@ export default function NotificationsScreen({ navigation }: any) {
   async function clearAll() {
     if (!profile?.id) return;
     try {
-      await supabase.from('notifications').delete().eq('user_id', profile.id);
+      await clearAllNotifications(profile.id);
       setNotifications([]);
     } catch {}
-  }
-
-  function timeAgo(dateStr: string) {
-    const diff = Date.now() - new Date(dateStr).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'Just now';
-    if (mins < 60) return `${mins}m ago`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h ago`;
-    const days = Math.floor(hrs / 24);
-    if (days < 7) return `${days}d ago`;
-    return new Date(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
   }
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
@@ -118,38 +151,14 @@ export default function NotificationsScreen({ navigation }: any) {
             <Text style={styles.emptySubtitle}>You're all caught up!</Text>
           </View>
         ) : (
-          <ScrollView
+          <FlatList
             style={styles.mainScroll}
             contentContainerStyle={styles.listContainer}
+            data={notifications}
+            keyExtractor={(notif) => notif.id}
+            renderItem={({ item }) => <NotificationRow notif={item} onPress={markRead} />}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-          >
-            {notifications.map((notif) => {
-              const cfg = ICON_MAP[notif.type] || ICON_MAP.system;
-              const Icon = cfg.icon;
-              return (
-                <TouchableOpacity
-                  key={notif.id}
-                  style={[styles.notifCard, !notif.is_read && styles.notifCardUnread]}
-                  onPress={() => markRead(notif.id)}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.iconContainer, { backgroundColor: `${cfg.color}18` }]}>
-                    <Icon size={22} color={cfg.color} />
-                  </View>
-                  <View style={styles.textContainer}>
-                    <View style={styles.titleRow}>
-                      <Text style={[styles.title, !notif.is_read && styles.titleUnread]} numberOfLines={1}>
-                        {notif.title}
-                      </Text>
-                      {!notif.is_read && <View style={styles.unreadDot} />}
-                    </View>
-                    <Text style={styles.desc} numberOfLines={2}>{notif.message}</Text>
-                    <Text style={styles.time}>{timeAgo(notif.created_at)}</Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+          />
         )}
       </View>
     </SafeAreaView>

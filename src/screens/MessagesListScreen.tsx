@@ -2,10 +2,11 @@
 import { View, Text, StyleSheet, TouchableOpacity, Platform, FlatList, ActivityIndicator, RefreshControl, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Search, MessageSquare, User } from 'lucide-react-native';
-import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
 import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
 import { RemoteAssets } from '../lib/assets';
+import { fetchMessagingProjects } from '../services/projectService';
+import { fetchLatestMessage, countUnreadMessages } from '../services/messageService';
 
 
 const LOCAL_IMAGES: Record<string, any> = {
@@ -35,25 +36,12 @@ export default function MessagesListScreen({ navigation }: any) {
     if (!profile?.id) { setLoading(false); return; }
     try {
       // Fetch projects the user is involved in (either as client or consultant)
-      let query = supabase
-        .from('projects')
-        .select('id, assignment_type, status, client_id, consultant_id, consultant_profiles(display_name, code, category, avatar_url)')
-        .in('status', [
-          'advance_pending', 'advance_paid',
-          'work_order_generated', 'work_order_accepted',
-          'in_progress', 'review_1', 'review_2', 'final_review',
-          'final_approved', 'balance_pending', 'balance_paid',
-          'delivered', 'completed',
-        ]);
-
-      if (currentRole === 'consultant' && consultantProfile?.id) {
-        query = query.eq('consultant_id', consultantProfile.id);
-      } else {
-        query = query.eq('client_id', profile.id);
-      }
-
-      const { data: projects, error } = await query.order('updated_at', { ascending: false });
-      if (error || !projects || projects.length === 0) {
+      const projects = await fetchMessagingProjects({
+        role: currentRole === 'consultant' ? 'consultant' : 'client',
+        clientId: profile.id,
+        consultantProfileId: consultantProfile?.id,
+      });
+      if (projects.length === 0) {
         setChats([]);
         setLoading(false);
         return;
@@ -62,14 +50,7 @@ export default function MessagesListScreen({ navigation }: any) {
       // For each project, get the latest message
       const chatList = await Promise.all(
         projects.map(async (proj: any) => {
-          const { data: msgs } = await supabase
-            .from('messages')
-            .select('text, created_at, sender_id')
-            .eq('project_id', proj.id)
-            .order('created_at', { ascending: false })
-            .limit(1);
-
-          const latestMsg = msgs?.[0];
+          const latestMsg = await fetchLatestMessage(proj.id);
           const consultant = proj.consultant_profiles;
           const otherName = currentRole === 'consultant'
             ? 'Client' // We don't join client profile here for simplicity
@@ -78,11 +59,7 @@ export default function MessagesListScreen({ navigation }: any) {
           const category = consultant?.category || 'designer';
 
           // Count unread (messages not from me)
-          const { count } = await supabase
-            .from('messages')
-            .select('id', { count: 'exact', head: true })
-            .eq('project_id', proj.id)
-            .neq('sender_id', profile.id);
+          const count = await countUnreadMessages(proj.id, profile.id);
 
           return {
             id: proj.id,

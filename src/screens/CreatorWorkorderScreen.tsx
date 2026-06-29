@@ -12,8 +12,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TopHeader from '../components/TopHeader';
-import { supabase } from '../lib/supabase';
-import { updateProjectStatus } from '../services/projectService';
+import { updateProjectStatus, fetchProjectSubmissions, createSubmission, createCollaborationRequest } from '../services/projectService';
+import { fetchApprovedConsultants } from '../services/consultantService';
 import { sendNotification } from '../lib/notifications';
 import * as ImagePicker from 'expo-image-picker';
 import {
@@ -84,12 +84,8 @@ export default function CreatorWorkorderScreen({ navigation, route }: any) {
     if (!project?.id) return;
     setLoading(true);
     try {
-      const { data } = await supabase
-        .from('submissions')
-        .select('*')
-        .eq('project_id', project.id)
-        .order('created_at', { ascending: true });
-      if (data) setSubmissions(data as Submission[]);
+      const data = await fetchProjectSubmissions(project.id);
+      setSubmissions(data);
     } catch (err) { console.log('[CreatorWO] fetch err:', err); }
     finally { setLoading(false); }
   }, [project?.id]);
@@ -148,13 +144,12 @@ export default function CreatorWorkorderScreen({ navigation, route }: any) {
     setIsUploading(true);
     try {
       const urls = await Promise.all(uploadFiles.map(uri => uploadToCloud(uri)));
-      const { error } = await supabase.from('submissions').insert({
+      await createSubmission({
         project_id: project.id,
         round: uploadRound,
         files: urls,
-        consultant_note: uploadNote || null,
+        consultant_note: uploadNote || undefined,
       });
-      if (error) { Alert.alert('Error', error.message); setIsUploading(false); return; }
 
       // From in_progress only review_1 is valid in the machine.
       // When status is review_2/final_review the status is already set; no transition needed.
@@ -207,15 +202,9 @@ export default function CreatorWorkorderScreen({ navigation, route }: any) {
   async function fetchCollaborators() {
     setLoadingCollab(true);
     try {
-      const { data } = await supabase
-        .from('consultant_profiles')
-        .select('*')
-        .eq('is_approved', true)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(10);
-      setCollaborators(data ?? []);
-      if (data && data.length > 0) setSelectedCollab(data[0]);
+      const data = await fetchApprovedConsultants(10);
+      setCollaborators(data);
+      if (data.length > 0) setSelectedCollab(data[0]);
     } catch {} finally { setLoadingCollab(false); }
   }
 
@@ -225,12 +214,10 @@ export default function CreatorWorkorderScreen({ navigation, route }: any) {
       { text: 'Cancel' },
       { text: 'Send Request', onPress: async () => {
         try {
-          await supabase.from('collaboration_requests').insert({
+          await createCollaborationRequest({
             project_id: project.id,
             requester_id: project.consultant_id,
             collaborator_id: selectedCollab.user_id,
-            status: 'pending',
-            created_at: new Date().toISOString(),
           });
           Alert.alert('Request Sent ✅', `${selectedCollab.display_name} has been invited.`);
         } catch (e: any) { Alert.alert('Error', e.message); }

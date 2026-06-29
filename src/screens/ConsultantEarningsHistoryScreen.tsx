@@ -15,8 +15,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TrendingUp, ShoppingBag, Briefcase, Star } from 'lucide-react-native';
 import TopHeader from '../components/TopHeader';
-import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
+import { fetchCompletedArtworkSales } from '../services/artworkService';
+import { fetchCompletedProjectsForEarnings, fetchRecentReviewsWithReviewer } from '../services/projectService';
 import { colors, fonts, fontSizes, spacing, radii } from '../styles/theme';
 
 const NAVY   = '#1B3A5C';
@@ -51,33 +52,15 @@ export default function ConsultantEarningsHistoryScreen({ navigation }: any) {
     if (!consultantProfile?.user_id) { setLoading(false); return; }
     setLoading(true);
     try {
-      // Artwork sales
-      const { data: salesData } = await supabase
-        .from('artwork_orders')
-        .select('*, shop_products(title, images)')
-        .eq('artist_id', consultantProfile.user_id)
-        .eq('status', 'completed')
-        .order('updated_at', { ascending: false });
+      const [salesData, projectData, reviewData] = await Promise.all([
+        fetchCompletedArtworkSales(consultantProfile.user_id),
+        fetchCompletedProjectsForEarnings(consultantProfile.user_id),
+        fetchRecentReviewsWithReviewer(consultantProfile.user_id),
+      ]);
 
-      // Completed projects
-      const { data: projectData } = await supabase
-        .from('projects')
-        .select('id, assignment_brief, final_offer, budget, updated_at, client:profiles!client_id(name)')
-        .eq('consultant_id', consultantProfile.user_id)
-        .eq('status', 'completed')
-        .order('updated_at', { ascending: false });
-
-      // Reviews
-      const { data: reviewData } = await supabase
-        .from('reviews')
-        .select('*, reviewer:profiles!reviewer_id(name, avatar_url)')
-        .eq('consultant_id', consultantProfile.user_id)
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-      setSales(salesData   ?? []);
-      setProjects(projectData ?? []);
-      setReviews(reviewData  ?? []);
+      setSales(salesData);
+      setProjects(projectData);
+      setReviews(reviewData);
     } catch {}
     finally { setLoading(false); }
   }

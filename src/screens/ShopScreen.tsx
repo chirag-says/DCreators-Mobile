@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, ImageBackground, TouchableOpacity, TextInput, Platform, Image, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { View, Text, FlatList, ScrollView, StyleSheet, ImageBackground, TouchableOpacity, TextInput, Platform, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Search, Filter, ShoppingBag, Heart } from 'lucide-react-native';
-import { supabase } from '../lib/supabase';
+import { fetchShopProducts } from '../services/shopService';
 import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
 import { RemoteAssets } from '../lib/assets';
 
@@ -12,6 +12,41 @@ const fontBody = fonts.body;
 const fontHeavy = fonts.heavy;
 
 const CATEGORIES = ['All', 'Templates', 'Digital Prints', 'UI Kits', 'Branding', 'Photography'];
+
+/* ── Memoized product card for the FlatList grid ────────────── */
+const ShopProductCard = React.memo(function ShopProductCard({
+  product,
+  onPress,
+}: {
+  product: any;
+  onPress: (product: any) => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={styles.productCard}
+      onPress={() => onPress(product)}
+      activeOpacity={0.9}
+    >
+      <ImageBackground
+        source={product.image}
+        style={styles.productImagePlaceholder}
+        resizeMode="cover"
+      >
+        <TouchableOpacity style={styles.favBtn}>
+          <Heart size={16} color={colors.primary} />
+        </TouchableOpacity>
+      </ImageBackground>
+      <View style={styles.productInfo}>
+        <Text style={styles.productCategory}>{product.category}</Text>
+        <Text style={styles.productTitle} numberOfLines={2}>{product.title}</Text>
+        <Text style={styles.productCreator}>by {product.creator}</Text>
+        <View style={styles.productFooter}>
+          <Text style={styles.productPrice}>₹{Number(product.price).toLocaleString()}</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+});
 
 export default function ShopScreen({ navigation }: any) {
   const [activeCategory, setActiveCategory] = useState('All');
@@ -23,39 +58,38 @@ export default function ShopScreen({ navigation }: any) {
 
   async function fetchProducts() {
     try {
-      const { data, error } = await supabase
-        .from('shop_products')
-        .select('*, consultant_profiles(display_name, code)')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
-
-      if (!error && data) {
-        const dbProducts = data.map((p: any) => ({
-          id: p.id,
-          title: p.title,
-          description: p.description,
-          category: p.category || 'Other',
-          price: Number(p.price),
-          images: p.images || [],
-          consultant_profiles: p.consultant_profiles,
-          creator: `${p.consultant_profiles?.code || '---'} / ${p.consultant_profiles?.display_name?.split(' ')[0] || 'Creator'}`,
-          image: p.images?.[0] ? { uri: p.images[0] } : { uri: RemoteAssets.designer },
-        }));
-        setProducts(dbProducts);
-      } else {
-        setProducts([]);
-      }
+      const data = await fetchShopProducts();
+      const dbProducts = data.map((p: any) => ({
+        id: p.id,
+        title: p.title,
+        description: p.description,
+        category: p.category || 'Other',
+        price: Number(p.price),
+        images: p.images || [],
+        consultant_profiles: p.consultant_profiles,
+        creator: `${p.consultant_profiles?.code || '---'} / ${p.consultant_profiles?.display_name?.split(' ')[0] || 'Creator'}`,
+        image: p.images?.[0] ? { uri: p.images[0] } : { uri: RemoteAssets.designer },
+      }));
+      setProducts(dbProducts);
     } catch {
       setProducts([]);
     }
     finally { setLoading(false); }
   }
 
-  const filteredProducts = products.filter(p => {
+  const filteredProducts = useMemo(() => products.filter(p => {
     const matchCat = activeCategory === 'All' || p.category === activeCategory;
     const matchSearch = !searchQuery || p.title.toLowerCase().includes(searchQuery.toLowerCase());
     return matchCat && matchSearch;
-  });
+  }), [products, activeCategory, searchQuery]);
+
+  const handleProductPress = useCallback((product: any) => {
+    navigation.navigate('ProductDetails', { product });
+  }, [navigation]);
+
+  const renderProduct = useCallback(({ item }: { item: any }) => (
+    <ShopProductCard product={item} onPress={handleProductPress} />
+  ), [handleProductPress]);
 
   return (
     <View style={styles.bg}>
@@ -104,72 +138,52 @@ export default function ShopScreen({ navigation }: any) {
           </ScrollView>
         </View>
 
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
-          <View style={styles.container}>
+        <FlatList
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingBottom: 24, paddingHorizontal: 16, gap: 20 }}
+          showsVerticalScrollIndicator={false}
+          data={loading ? [] : filteredProducts}
+          keyExtractor={(item) => item.id}
+          numColumns={2}
+          columnWrapperStyle={styles.productRow}
+          renderItem={renderProduct}
+          ListHeaderComponent={
+            <>
+              {/* Featured Banner */}
+              <View style={styles.featuredSection}>
+                <ImageBackground source={{ uri: RemoteAssets.photographer }} style={styles.featuredCard} imageStyle={{ opacity: 0.6 }}>
+                  <View style={[styles.featuredContent, { backgroundColor: 'rgba(67, 56, 202, 0.7)' }]}>
+                    <Text style={styles.featuredBadge}>FEATURED BUNDLE</Text>
+                    <Text style={styles.featuredTitle}>The Ultimate Designer's Toolkit 2026</Text>
+                    <Text style={styles.featuredPrice}>₹4,999 <Text style={styles.strikethrough}>₹9,999</Text></Text>
+                    <TouchableOpacity style={styles.buyBtn}>
+                      <Text style={styles.buyBtnText}>Shop Now</Text>
+                    </TouchableOpacity>
+                  </View>
+                </ImageBackground>
+              </View>
 
-            {/* Featured Banner */}
-            <View style={styles.featuredSection}>
-              <ImageBackground source={{ uri: RemoteAssets.photographer }} style={styles.featuredCard} imageStyle={{ opacity: 0.6 }}>
-                <View style={[styles.featuredContent, { backgroundColor: 'rgba(67, 56, 202, 0.7)' }]}>
-                  <Text style={styles.featuredBadge}>FEATURED BUNDLE</Text>
-                  <Text style={styles.featuredTitle}>The Ultimate Designer's Toolkit 2026</Text>
-                  <Text style={styles.featuredPrice}>₹4,999 <Text style={styles.strikethrough}>₹9,999</Text></Text>
-                  <TouchableOpacity style={styles.buyBtn}>
-                    <Text style={styles.buyBtnText}>Shop Now</Text>
-                  </TouchableOpacity>
-                </View>
-              </ImageBackground>
-            </View>
-
-            {/* Section Header */}
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>
-                {activeCategory === 'All' ? 'Trending Assets' : activeCategory}
-              </Text>
-              <Text style={styles.countText}>{filteredProducts.length} items</Text>
-            </View>
-
-            {/* Products Grid */}
-            {loading ? (
+              {/* Section Header */}
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>
+                  {activeCategory === 'All' ? 'Trending Assets' : activeCategory}
+                </Text>
+                <Text style={styles.countText}>{filteredProducts.length} items</Text>
+              </View>
+            </>
+          }
+          ListEmptyComponent={
+            loading ? (
               <ActivityIndicator size="large" color="#1B3A5C" style={{ marginTop: 40 }} />
-            ) : filteredProducts.length === 0 ? (
+            ) : (
               <View style={{ alignItems: 'center', paddingVertical: 60 }}>
                 <ShoppingBag size={56} color={colors.borderInput} />
                 <Text style={{ fontSize: 16, fontWeight: '700', color: colors.textSecondary, marginTop: 16, fontFamily: fontHeavy }}>No products yet</Text>
                 <Text style={{ fontSize: 13, color: colors.textTertiary, fontFamily: fontBody, marginTop: 4 }}>Products listed by creators will appear here</Text>
               </View>
-            ) : (
-              <View style={styles.productGrid}>
-                {filteredProducts.map(product => (
-                  <TouchableOpacity
-                    key={product.id}
-                    style={styles.productCard}
-                    onPress={() => navigation.navigate('ProductDetails', { product })}
-                    activeOpacity={0.9}
-                  >
-                    <ImageBackground
-                      source={typeof product.image === 'number' ? product.image : product.image}
-                      style={styles.productImagePlaceholder}
-                      resizeMode="cover"
-                    >
-                      <TouchableOpacity style={styles.favBtn}>
-                        <Heart size={16} color={colors.primary} />
-                      </TouchableOpacity>
-                    </ImageBackground>
-                    <View style={styles.productInfo}>
-                      <Text style={styles.productCategory}>{product.category}</Text>
-                      <Text style={styles.productTitle} numberOfLines={2}>{product.title}</Text>
-                      <Text style={styles.productCreator}>by {product.creator}</Text>
-                      <View style={styles.productFooter}>
-                        <Text style={styles.productPrice}>₹{Number(product.price).toLocaleString()}</Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
-        </ScrollView>
+            )
+          }
+        />
       </SafeAreaView>
     </View>
   );
@@ -226,9 +240,9 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 18, fontWeight: '700', color: '#111', fontFamily: fontHeavy },
   countText: { fontSize: 12, color: '#6B7280', fontFamily: fontMedium },
 
-  productGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 14 },
+  productRow: { justifyContent: 'space-between', gap: 14 },
   productCard: {
-    width: '47.5%', backgroundColor: colors.cardBg, borderRadius: radii.lg,
+    flex: 1, maxWidth: '48%', backgroundColor: colors.cardBg, borderRadius: radii.lg,
     borderWidth: 1, borderColor: colors.border, overflow: 'hidden',
     ...shadows.sm,
   },

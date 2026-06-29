@@ -43,7 +43,7 @@ interface FeaturedCreatorCardProps {
   onPress: (creator: CreatorCardViewModel) => void;
 }
 
-export default function FeaturedCreatorCard({ creator, index = 0, onPress }: FeaturedCreatorCardProps) {
+function FeaturedCreatorCard({ creator, index = 0, onPress }: FeaturedCreatorCardProps) {
   const hasRealAvatar = creator.avatar_url && creator.avatar_url.startsWith('http');
   const avatarUrl = hasRealAvatar
     ? creator.avatar_url!
@@ -107,6 +107,8 @@ export default function FeaturedCreatorCard({ creator, index = 0, onPress }: Fea
     </TouchableOpacity>
   );
 }
+
+export default React.memo(FeaturedCreatorCard);
 
 const styles = StyleSheet.create({
   wrap: {

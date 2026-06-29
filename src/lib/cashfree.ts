@@ -81,11 +81,13 @@ export async function verifyPaymentStatus(orderId: string): Promise<{
   status: 'pending' | 'completed' | 'failed';
   cashfreePaymentId?: string;
 }> {
-  // Poll the payment record in our DB (the webhook would have updated it)
-  let attempts = 0;
-  const maxAttempts = 10;
+  // Poll the payment record in our DB (the webhook would have updated it).
+  // Exponential backoff (1.5s -> 8s cap) over ~20 attempts gives the webhook
+  // a realistic ~2 minute window before we surface a "still processing" state.
+  const maxAttempts = 20;
+  let delayMs = 1500;
 
-  while (attempts < maxAttempts) {
+  for (let attempts = 0; attempts < maxAttempts; attempts++) {
     const { data, error } = await supabase
       .from('payments')
       .select('status, cashfree_payment_id')
@@ -99,9 +101,8 @@ export async function verifyPaymentStatus(orderId: string): Promise<{
       };
     }
 
-    // Wait 2 seconds before next check
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    attempts++;
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    delayMs = Math.min(delayMs * 1.4, 8000);
   }
 
   return { status: 'pending' };

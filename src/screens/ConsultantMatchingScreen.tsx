@@ -29,8 +29,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SlidersHorizontal, Megaphone, ArrowLeft, ExternalLink } from 'lucide-react-native';
-import { supabase } from '../lib/supabase';
-import { updateProjectStatus } from '../services/projectService';
+import { updateProjectStatus, assignConsultantToProject } from '../services/projectService';
+import { fetchMatchingConsultants } from '../services/consultantService';
 import { colors, fonts, fontSizes, spacing, radii } from '../styles/theme';
 import { RemoteAssets } from '../lib/assets';
 import type { Project } from '../types';
@@ -100,20 +100,9 @@ export default function ConsultantMatchingScreen({ navigation, route }: any) {
         roleToCategory[project.assignment_type] ??
         ['photographer', 'videographer', 'designer', 'sculptor', 'artisan'];
 
-      const { data, error } = await supabase
-        .from('consultant_profiles')
-        .select('id, user_id, display_name, code, experience, avatar_url, base_price, category, is_approved')
-        .in('category', allowedCategories)
-        .eq('is_approved', true)
-        .eq('is_active', true)
-        // ±5% budget filter: base_price between low and high
-        .gte('base_price', low)
-        .lte('base_price', high)
-        .order('base_price', { ascending: true })
-        .limit(20);
-
-      if (error) throw new Error(error.message);
-      setConsultants((data ?? []) as MatchedConsultant[]);
+      // ±5% budget filter: base_price between low and high
+      const data = await fetchMatchingConsultants({ categories: allowedCategories, minPrice: low, maxPrice: high });
+      setConsultants(data as MatchedConsultant[]);
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Failed to load consultants.');
     } finally {
@@ -132,11 +121,7 @@ export default function ConsultantMatchingScreen({ navigation, route }: any) {
 
     try {
       // First patch consultant_id (not a status field, extraFields handles it)
-      const { error: patchErr } = await supabase
-        .from('projects')
-        .update({ consultant_id: consultant.user_id })
-        .eq('id', project.id);
-      if (patchErr) throw new Error(patchErr.message);
+      await assignConsultantToProject(project.id, consultant.user_id);
 
       // Validate draft → assigned through the status machine
       await updateProjectStatus(project.id, 'assigned');

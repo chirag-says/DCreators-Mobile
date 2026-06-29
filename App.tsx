@@ -22,7 +22,6 @@ import AssignProjectScreen from './src/screens/AssignProjectScreen';
 import SearchScreen from './src/screens/SearchScreen';
 import FloatingQueryScreen from './src/screens/FloatingQueryScreen';
 import ClientReviewScreen from './src/screens/ClientReviewScreen';
-import ClientOnboardingScreen from './src/screens/ClientOnboardingScreen';
 import PaymentScreen from './src/screens/PaymentScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import OTPVerificationScreen from './src/screens/OTPVerificationScreen';
@@ -135,8 +134,7 @@ export default function App() {
           <Stack.Screen name="OTPVerification" component={OTPVerificationScreen} />
           <Stack.Screen name="Intro" component={IntroScreen} />
           <Stack.Screen name="CreateCreatorAccount" component={CreateCreatorAccountScreen} />
-          <Stack.Screen name="ClientOnboarding" component={ClientOnboardingScreen} />
-          
+
           {/* Main Logged-In Flow with Fixed Bottom Navigation */}
           <Stack.Screen name="Main" component={MainTabs} />
 

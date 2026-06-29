@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ArrowLeft, CreditCard, Smartphone, ShieldCheck, Lock,
 } from 'lucide-react-native';
-import { supabase } from '../lib/supabase';
+import { updateArtworkOrderStatus, recordArtworkPayment } from '../services/artworkService';
 import { sendNotification } from '../lib/notifications';
 import { colors, fonts, fontSizes, spacing, radii } from '../styles/theme';
 import type { ArtworkOrder } from '../types';
@@ -55,19 +55,14 @@ export default function ArtworkPaymentScreen({ navigation, route }: any) {
     setPaying(true);
     try {
       const newStatus = isBalance ? 'completed' : 'advance_paid';
-      await supabase.from('artwork_orders').update({
-        status: newStatus,
-        updated_at: new Date().toISOString(),
-      }).eq('id', order.id);
+      await updateArtworkOrderStatus(order.id, newStatus);
 
       // Record payment
-      await supabase.from('artwork_payments').insert({
+      await recordArtworkPayment({
         order_id:     order.id,
         payer_id:     order.buyer_id,
         amount:       grandTotal,
         payment_type: paymentType,
-        status:       'completed',
-        created_at:   new Date().toISOString(),
       });
 
       // Notify artist

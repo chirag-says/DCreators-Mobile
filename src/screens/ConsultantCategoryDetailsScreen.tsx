@@ -15,8 +15,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Send, Bell } from 'lucide-react-native';
-import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
+import { updateConsultantProfile } from '../services/consultantService';
 import { colors, fonts, fontSizes, spacing, radii } from '../styles/theme';
 import { CATEGORY_QUESTIONS, type CategoryQuestion } from '../config/categoryQuestions';
 
@@ -74,11 +74,7 @@ export default function ConsultantCategoryDetailsScreen({ navigation, route }: a
 
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from('consultant_profiles')
-        .update({ category_details: answers })
-        .eq('id', consultantProfile.id);
-      if (error) throw error;
+      await updateConsultantProfile(consultantProfile.id, { category_details: answers });
       await fetchConsultantProfile();
 
       if (fromOnboarding) {

@@ -182,8 +182,8 @@ export default function PaymentScreen({ navigation, route }: any) {
         Alert.alert('Payment Failed', 'Your payment was not successful. Please try again.');
       } else {
         Alert.alert(
-          'Payment Processing',
-          'Your payment is being verified. You will receive a notification once confirmed.',
+          'Still Processing',
+          "We haven't received confirmation from the bank yet. This can take a few minutes — we'll send you a notification the moment it's confirmed. No need to retry the payment.",
           [{ text: 'OK', onPress: () => navigation.goBack() }]
         );
       }

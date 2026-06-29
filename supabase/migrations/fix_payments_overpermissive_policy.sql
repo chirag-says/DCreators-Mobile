@@ -1,0 +1,16 @@
+-- CRITICAL Phase 1 RLS finding: add_cashfree_columns.sql added
+--   CREATE POLICY "Service role manages all payments" ON payments
+--     FOR ALL USING (true) WITH CHECK (true);
+-- with no `TO service_role` clause, so it applies to every role, not just
+-- the webhook's service-role key. RLS combines multiple permissive policies
+-- for the same command with OR, so this single USING(true) policy silently
+-- overrode "Payer reads own payments" — any authenticated user could
+-- SELECT/UPDATE/DELETE every row in `payments` (amounts, Cashfree order/
+-- payment IDs, status) for every other user.
+--
+-- The Cashfree webhook edge function already uses the service-role key,
+-- which bypasses RLS automatically — this policy was redundant for its
+-- intended purpose and dangerous for everyone else. Drop it; the existing
+-- "Payer reads own payments" / "Payer creates payments" / "Consultant reads
+-- payments for own projects" policies are sufficient.
+DROP POLICY IF EXISTS "Service role manages all payments" ON payments;

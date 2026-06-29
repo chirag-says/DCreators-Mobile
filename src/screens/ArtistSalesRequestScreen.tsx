@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Truck, CreditCard, CheckCircle2, ShieldCheck } from 'lucide-react-native';
-import { supabase } from '../lib/supabase';
+import { fetchArtworkOrderById, updateArtworkOrderStatus } from '../services/artworkService';
 import { sendNotification } from '../lib/notifications';
 import { colors, fonts, fontSizes, spacing, radii } from '../styles/theme';
 import type { ArtworkOrder } from '../types';
@@ -32,12 +32,11 @@ export default function ArtistSalesRequestScreen({ navigation, route }: any) {
     if (!orderId) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('artwork_orders')
-        .select('*, shop_products(title,description,price,images,category), buyer_profile:profiles!buyer_id(name,avatar_url)')
-        .eq('id', orderId).single();
-      if (error) throw error;
-      setOrder(data as ArtworkOrder);
+      const data = await fetchArtworkOrderById(
+        orderId,
+        '*, shop_products(title,description,price,images,category), buyer_profile:profiles!buyer_id(name,avatar_url)'
+      );
+      setOrder(data);
     } catch (e: any) {
       Alert.alert('Error', e.message);
     } finally { setLoading(false); }
@@ -48,7 +47,7 @@ export default function ArtistSalesRequestScreen({ navigation, route }: any) {
     if (!order) return;
     setSaving(true);
     try {
-      await supabase.from('artwork_orders').update({ status: 'accepted', updated_at: new Date().toISOString() }).eq('id', order.id);
+      await updateArtworkOrderStatus(order.id, 'accepted');
       sendNotification({ userId: order.buyer_id, title: '🎨 Purchase Request Accepted!', message: `Artist accepted your request. Please complete the advance payment.`, type: 'payment' });
       Alert.alert('Request Accepted ✅', 'Buyer notified to pay advance.', [
         { text: 'OK', onPress: () => navigation.replace('ArtistOrderDispatch', { orderId: order.id }) },
@@ -64,7 +63,7 @@ export default function ArtistSalesRequestScreen({ navigation, route }: any) {
       { text: 'Decline', style: 'destructive', onPress: async () => {
         setSaving(true);
         try {
-          await supabase.from('artwork_orders').update({ status: 'declined', updated_at: new Date().toISOString() }).eq('id', order.id);
+          await updateArtworkOrderStatus(order.id, 'declined');
           sendNotification({ userId: order.buyer_id, title: 'Request Declined', message: `The artist has declined your purchase request.`, type: 'system' });
           navigation.goBack();
         } catch (e: any) { Alert.alert('Error', e.message); }

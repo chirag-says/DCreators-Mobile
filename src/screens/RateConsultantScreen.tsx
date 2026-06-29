@@ -15,8 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Zap, MessageSquare, Gem, Star } from 'lucide-react-native';
 import FigmaBottomBar from '../components/FigmaBottomBar';
-import { supabase } from '../lib/supabase';
-import { updateProjectStatus } from '../services/projectService';
+import { updateProjectStatus, createReview } from '../services/projectService';
 import { sendNotification } from '../lib/notifications';
 import { colors, fonts, fontSizes, spacing, radii } from '../styles/theme';
 
@@ -55,7 +54,7 @@ export default function RateConsultantScreen({ navigation, route }: any) {
     setSaving(true);
     try {
       // Insert review record
-      await supabase.from('reviews').insert({
+      await createReview({
         project_id:          project.id,
         client_id:           project.client_id,
         consultant_id:       project.consultant_id,
@@ -64,7 +63,6 @@ export default function RateConsultantScreen({ navigation, route }: any) {
         fast_delivery:       !!chips['fast_delivery'],
         great_comms:         !!chips['great_comms'],
         exceeded_expectation: !!chips['exceeded_expectation'],
-        created_at:          new Date().toISOString(),
       });
 
       // delivered → completed via the status machine

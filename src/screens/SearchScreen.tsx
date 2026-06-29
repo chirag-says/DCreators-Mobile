@@ -1,8 +1,8 @@
-﻿import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platform, Image, ActivityIndicator } from 'react-native';
+﻿import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, FlatList, Platform, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search, SlidersHorizontal, ChevronLeft, User } from 'lucide-react-native';
-import { supabase } from '../lib/supabase';
+import { fetchTrendingConsultants, searchConsultants } from '../services/consultantService';
 import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
 import { RemoteAssets } from '../lib/assets';
 
@@ -34,6 +34,52 @@ const LOCAL_IMAGES: Record<string, any> = {
   'dcreators/artisan': { uri: RemoteAssets.artisan },
 };
 
+const ConsultantCard = React.memo(function ConsultantCard({
+  consultant,
+  onPress,
+}: {
+  consultant: any;
+  onPress: (consultant: any) => void;
+}) {
+  const hasRealAvatar = consultant.avatar_url && consultant.avatar_url.startsWith('http');
+  const avatarSource = hasRealAvatar
+    ? { uri: consultant.avatar_url }
+    : LOCAL_IMAGES[`dcreators/${consultant.category}`];
+
+  return (
+    <TouchableOpacity
+      style={styles.resultCard}
+      activeOpacity={0.85}
+      onPress={() => onPress(consultant)}
+    >
+      <View style={styles.resultAvatar}>
+        {avatarSource ? (
+          <Image source={avatarSource} style={styles.resultAvatarImg} />
+        ) : (
+          <User size={32} color="#9CA3AF" />
+        )}
+      </View>
+      <View style={styles.resultInfo}>
+        <Text style={styles.resultName}>{consultant.display_name}</Text>
+        <Text style={styles.resultSub} numberOfLines={1}>{consultant.subtitle || consultant.expertise}</Text>
+        <View style={styles.resultMeta}>
+          <View style={[styles.categoryBadge, { backgroundColor: CATEGORY_COLORS[consultant.category] || '#666' }]}>
+            <Text style={styles.categoryBadgeText}>
+              {consultant.category.charAt(0).toUpperCase() + consultant.category.slice(1)}
+            </Text>
+          </View>
+          {consultant.experience && (
+            <Text style={styles.resultExp}>{consultant.experience}</Text>
+          )}
+          {!consultant.is_approved && (
+            <Text style={styles.pendingBadge}>Pending</Text>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
 export default function SearchScreen({ navigation }: any) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -61,36 +107,16 @@ export default function SearchScreen({ navigation }: any) {
 
   async function fetchTrending() {
     try {
-      const { data, error } = await supabase
-        .from('consultant_profiles')
-        .select('*')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(6);
-      if (!error && data) setTrendingCreators(data);
+      const data = await fetchTrendingConsultants();
+      setTrendingCreators(data);
     } catch {}
   }
 
   async function performSearch() {
     setIsSearching(true);
     try {
-      let query = supabase
-        .from('consultant_profiles')
-        .select('*')
-        .eq('is_active', true);
-
-      if (selectedCategory) {
-        query = query.eq('category', selectedCategory);
-      }
-
-      if (searchQuery.trim()) {
-        query = query.or(
-          `display_name.ilike.%${searchQuery}%,expertise.ilike.%${searchQuery}%,subtitle.ilike.%${searchQuery}%`
-        );
-      }
-
-      const { data, error } = await query.limit(20);
-      setResults((!error && data) ? data : []);
+      const data = await searchConsultants({ query: searchQuery, category: selectedCategory, limit: 20 });
+      setResults(data);
     } catch {
       setResults([]);
     } finally {
@@ -98,57 +124,20 @@ export default function SearchScreen({ navigation }: any) {
     }
   }
 
-  function renderConsultantCard(consultant: any) {
-    const hasRealAvatar = consultant.avatar_url && consultant.avatar_url.startsWith('http');
-    const avatarSource = hasRealAvatar
-      ? { uri: consultant.avatar_url }
-      : LOCAL_IMAGES[`dcreators/${consultant.category}`];
-
-    return (
-      <TouchableOpacity
-        key={consultant.id}
-        style={styles.resultCard}
-        activeOpacity={0.85}
-        onPress={() => navigation.navigate('CreatorProfile', { creator: {
-          id: consultant.id,
-          name: consultant.display_name,
-          code: consultant.code,
-          subtitle: consultant.subtitle,
-          experience: consultant.experience,
-          expertise: consultant.expertise,
-          category: consultant.category,
-          base_price: consultant.base_price,
-          avatar_url: consultant.avatar_url,
-          portfolio_images: consultant.portfolio_images,
-        }})}
-      >
-        <View style={styles.resultAvatar}>
-          {avatarSource ? (
-            <Image source={avatarSource} style={styles.resultAvatarImg} />
-          ) : (
-            <User size={32} color="#9CA3AF" />
-          )}
-        </View>
-        <View style={styles.resultInfo}>
-          <Text style={styles.resultName}>{consultant.display_name}</Text>
-          <Text style={styles.resultSub} numberOfLines={1}>{consultant.subtitle || consultant.expertise}</Text>
-          <View style={styles.resultMeta}>
-            <View style={[styles.categoryBadge, { backgroundColor: CATEGORY_COLORS[consultant.category] || '#666' }]}>
-              <Text style={styles.categoryBadgeText}>
-                {consultant.category.charAt(0).toUpperCase() + consultant.category.slice(1)}
-              </Text>
-            </View>
-            {consultant.experience && (
-              <Text style={styles.resultExp}>{consultant.experience}</Text>
-            )}
-            {!consultant.is_approved && (
-              <Text style={styles.pendingBadge}>Pending</Text>
-            )}
-          </View>
-        </View>
-      </TouchableOpacity>
-    );
-  }
+  const handleCardPress = useCallback((consultant: any) => {
+    navigation.navigate('CreatorProfile', { creator: {
+      id: consultant.id,
+      name: consultant.display_name,
+      code: consultant.code,
+      subtitle: consultant.subtitle,
+      experience: consultant.experience,
+      expertise: consultant.expertise,
+      category: consultant.category,
+      base_price: consultant.base_price,
+      avatar_url: consultant.avatar_url,
+      portfolio_images: consultant.portfolio_images,
+    }});
+  }, [navigation]);
 
   const showTrending = !searchQuery && !selectedCategory && trendingCreators.length > 0;
 
@@ -193,54 +182,44 @@ export default function SearchScreen({ navigation }: any) {
           ))}
         </ScrollView>
 
-        <ScrollView style={styles.mainScroll} contentContainerStyle={{ paddingBottom: 8 }}>
-          <View style={styles.container}>
-            
-            {/* Trending Creators — shown when no query */}
-            {showTrending && (
-              <View style={styles.recentSection}>
-                <Text style={styles.sectionTitle}>Trending Creators</Text>
-                {trendingCreators.map((c) => renderConsultantCard(c))}
-              </View>
-            )}
-
-            {/* No trending & no query — empty state */}
-            {!searchQuery && !selectedCategory && trendingCreators.length === 0 && (
-              <View style={{ paddingVertical: 60, alignItems: 'center' }}>
-                <Search size={48} color="#D1D5DB" />
-                <Text style={{ marginTop: 16, color: '#9CA3AF', fontSize: 15, fontFamily: fontBody }}>
-                  Search for consultants by name or skill
-                </Text>
-              </View>
-            )}
-
-            {/* Loading */}
-            {isSearching && (
-              <View style={{ paddingVertical: 40, alignItems: 'center' }}>
-                <ActivityIndicator size="large" color="#1B3A5C" />
-              </View>
-            )}
-
-            {/* Results */}
-            {!isSearching && results.length > 0 && (
-              <View style={styles.resultsSection}>
-                <Text style={styles.sectionTitle}>{results.length} Consultant{results.length > 1 ? 's' : ''} found</Text>
-                {results.map((consultant) => renderConsultantCard(consultant))}
-              </View>
-            )}
-
-            {/* No results */}
-            {!isSearching && (searchQuery || selectedCategory) && results.length === 0 && (
-              <View style={{ paddingVertical: 60, alignItems: 'center' }}>
-                <Search size={48} color="#D1D5DB" />
-                <Text style={{ marginTop: 16, color: '#9CA3AF', fontSize: 15, fontFamily: fontBody }}>
-                  No consultants found
-                </Text>
-              </View>
-            )}
-
+        {isSearching ? (
+          <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+            <ActivityIndicator size="large" color="#1B3A5C" />
           </View>
-        </ScrollView>
+        ) : (
+          <FlatList
+            style={styles.mainScroll}
+            contentContainerStyle={[styles.container, { paddingBottom: 8 }]}
+            data={showTrending ? trendingCreators : results}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => <ConsultantCard consultant={item} onPress={handleCardPress} />}
+            ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
+            ListHeaderComponent={
+              showTrending ? (
+                <Text style={styles.sectionTitle}>Trending Creators</Text>
+              ) : results.length > 0 ? (
+                <Text style={styles.sectionTitle}>{results.length} Consultant{results.length > 1 ? 's' : ''} found</Text>
+              ) : null
+            }
+            ListEmptyComponent={
+              !searchQuery && !selectedCategory ? (
+                <View style={{ paddingVertical: 60, alignItems: 'center' }}>
+                  <Search size={48} color="#D1D5DB" />
+                  <Text style={{ marginTop: 16, color: '#9CA3AF', fontSize: 15, fontFamily: fontBody }}>
+                    Search for consultants by name or skill
+                  </Text>
+                </View>
+              ) : (
+                <View style={{ paddingVertical: 60, alignItems: 'center' }}>
+                  <Search size={48} color="#D1D5DB" />
+                  <Text style={{ marginTop: 16, color: '#9CA3AF', fontSize: 15, fontFamily: fontBody }}>
+                    No consultants found
+                  </Text>
+                </View>
+              )
+            }
+          />
+        )}
       </View>
     </SafeAreaView>
   );

@@ -19,7 +19,7 @@ import {
 } from 'react-native';
 import { FileText, Truck, CreditCard, CheckSquare } from 'lucide-react-native';
 import { useAuthStore } from '../../store/useAuthStore';
-import { supabase } from '../../lib/supabase';
+import { fetchArtworkOrdersForArtist, updateArtworkOrderStatus } from '../../services/artworkService';
 import { colors, fonts, fontSizes, spacing, radii } from '../../styles/theme';
 import type { ArtworkOrder } from '../../types';
 import type { MainTabScreenProps } from '../../types/navigation';
@@ -48,17 +48,8 @@ export default function ConsultantDashboard({ navigation }: ConsultantDashboardP
   async function fetchOrders() {
     if (!artistId) { setLoading(false); return; }
     try {
-      const { data, error } = await supabase
-        .from('artwork_orders')
-        .select(
-          '*, shop_products(title,description,price,images,category), buyer_profile:profiles!buyer_id(name,avatar_url)'
-        )
-        .eq('artist_id', artistId)
-        .eq('status', 'requested')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setOrders((data ?? []) as ArtworkOrder[]);
+      const data = await fetchArtworkOrdersForArtist(artistId, 'requested');
+      setOrders(data);
     } catch (e: any) {
       console.warn('[ConsultantDashboard] artwork_orders fetch error:', e.message);
       setOrders([]);
@@ -89,11 +80,7 @@ export default function ConsultantDashboard({ navigation }: ConsultantDashboardP
       return;
     }
     try {
-      const { error } = await supabase
-        .from('artwork_orders')
-        .update({ status: 'accepted', updated_at: new Date().toISOString() })
-        .eq('id', order.id);
-      if (error) throw error;
+      await updateArtworkOrderStatus(order.id, 'accepted');
       Alert.alert('Done', 'Request accepted! The buyer has been notified.');
       fetchOrders();
     } catch (e: any) {
@@ -109,11 +96,7 @@ export default function ConsultantDashboard({ navigation }: ConsultantDashboardP
         style: 'destructive',
         onPress: async () => {
           try {
-            const { error } = await supabase
-              .from('artwork_orders')
-              .update({ status: 'declined', updated_at: new Date().toISOString() })
-              .eq('id', order.id);
-            if (error) throw error;
+            await updateArtworkOrderStatus(order.id, 'declined');
             Alert.alert('Done', 'Request declined.');
             fetchOrders();
           } catch (e: any) {

@@ -38,7 +38,6 @@ export type RootStackParamList = {
   OTPVerification: { email: string };
   Intro: undefined;
   CreateCreatorAccount: undefined;
-  ClientOnboarding: undefined;
 
   // Main tab navigator
   Main: NavigatorScreenParams<MainTabParamList>;

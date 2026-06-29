@@ -3,7 +3,7 @@ import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Platform, Activit
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Star, Bookmark, Trash2, User, Heart } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabase } from '../lib/supabase';
+import { fetchConsultantsByIds } from '../services/consultantService';
 import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
 import { RemoteAssets } from '../lib/assets';
 
@@ -43,17 +43,8 @@ export default function SavedCreatorsScreen({ navigation }: any) {
       }
 
       // Fetch profiles from Supabase
-      const { data, error } = await supabase
-        .from('consultant_profiles')
-        .select('*')
-        .in('id', savedIds)
-        .eq('is_active', true);
-
-      if (!error && data) {
-        setSavedCreators(data);
-      } else {
-        setSavedCreators([]);
-      }
+      const data = await fetchConsultantsByIds(savedIds);
+      setSavedCreators(data);
     } catch {
       setSavedCreators([]);
     } finally {

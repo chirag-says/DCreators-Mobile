@@ -16,8 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TopHeader from '../components/TopHeader';
-import { supabase } from '../lib/supabase';
-import { updateProjectStatus } from '../services/projectService';
+import { updateProjectStatus, fetchProjectSubmissions } from '../services/projectService';
 import {
   FileText, ImageIcon, ChevronRight, Info,
   ArrowLeft, Lock, Download, Star, MessageCircle,
@@ -64,15 +63,8 @@ export default function ClientWorkorderScreen({ navigation, route }: any) {
     if (!project?.id) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('submissions')
-        .select('*')
-        .eq('project_id', project.id)
-        .order('created_at', { ascending: true });
-
-      if (!error && data) {
-        setSubmissions(data as Submission[]);
-      }
+      const data = await fetchProjectSubmissions(project.id);
+      setSubmissions(data);
     } catch (err) {
       console.log('[ClientWorkorder] fetch error:', err);
     } finally {

@@ -40,7 +40,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
 };
 
 
-export default function ProjectCard({ project, onAccept, onReject, onViewWorkorder }: ProjectCardProps) {
+function ProjectCard({ project, onAccept, onReject, onViewWorkorder }: ProjectCardProps) {
   // Fallback to 'assigned' config if status not in map (future-proofing)
   const statusCfg = STATUS_CONFIG[project.status] ?? STATUS_CONFIG.assigned;
   const StatusIcon = statusCfg.icon;
@@ -99,6 +99,8 @@ export default function ProjectCard({ project, onAccept, onReject, onViewWorkord
     </View>
   );
 }
+
+export default React.memo(ProjectCard);
 
 const styles = StyleSheet.create({
   card: {

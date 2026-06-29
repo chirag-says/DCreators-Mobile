@@ -15,8 +15,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, ShieldCheck, ChevronDown, Send, Save, Edit3, Bell } from 'lucide-react-native';
-import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
+import { fetchConsultantServicePricing, upsertConsultantServicePricing, updateConsultantProfile } from '../services/consultantService';
 import { colors, fonts, fontSizes, spacing, radii } from '../styles/theme';
 
 const NAVY = '#1B3A5C';
@@ -132,13 +132,7 @@ export default function ConsultantServicePricingScreen({ navigation, route }: an
     if (!consultantProfile?.id) { setLoading(false); return; }
     setLoading(true);
     try {
-      const { data } = await supabase
-        .from('consultant_service_pricing')
-        .select('service_name, price')
-        .eq('consultant_id', consultantProfile.id)
-        .eq('category', category);
-      const map: Record<string, string> = {};
-      (data ?? []).forEach((row: any) => { map[row.service_name] = String(row.price ?? 0); });
+      const map = await fetchConsultantServicePricing(consultantProfile.id, category);
       setPrices(map);
     } catch {}
     finally { setLoading(false); }
@@ -158,12 +152,8 @@ export default function ConsultantServicePricingScreen({ navigation, route }: an
         service_name: svc,
         price: Number(prices[svc] ?? 0),
         is_submitted: submit,
-        updated_at: new Date().toISOString(),
       }));
-      const { error } = await supabase
-        .from('consultant_service_pricing')
-        .upsert(upserts, { onConflict: 'consultant_id,category,service_name' });
-      if (error) throw error;
+      await upsertConsultantServicePricing(upserts);
 
       // The chosen category, a base price, and a searchable expertise/subtitle
       // string live on consultant_profiles itself — Explore/Search/CreatorProfile
@@ -172,10 +162,9 @@ export default function ConsultantServicePricingScreen({ navigation, route }: an
       const basePrice = pricedServices.length ? Number(prices[pricedServices[0]]) : null;
       const expertise = [CATEGORY_HEADLINE[category], ...pricedServices.slice(0, 4)].join(', ');
       const subtitle = `${category} Consultant`;
-      await supabase
-        .from('consultant_profiles')
-        .update({ category: CATEGORY_DB_VALUE[category], base_price: basePrice, expertise, subtitle })
-        .eq('id', consultantProfile.id);
+      await updateConsultantProfile(consultantProfile.id, {
+        category: CATEGORY_DB_VALUE[category], base_price: basePrice, expertise, subtitle,
+      });
       await fetchConsultantProfile();
 
       if (submit) {

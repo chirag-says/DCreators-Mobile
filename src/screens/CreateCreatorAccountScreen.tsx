@@ -18,6 +18,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
+import { upsertConsultantProfile } from '../services/consultantService';
 import { uploadToCloudinary, uploadRawToCloudinary } from '../lib/cloudinary';
 import { colors, fonts, fontSizes } from '../styles/theme';
 
@@ -58,6 +59,7 @@ const BANK_OPTIONS = [...INDIAN_BANKS].sort((a, b) => a.localeCompare(b)).concat
 export default function CreateCreatorAccountScreen({ navigation }: any) {
   const profile = useAuthStore(s => s.profile);
   const fetchConsultantProfile = useAuthStore(s => s.fetchConsultantProfile);
+  const updateProfile = useAuthStore(s => s.updateProfile);
 
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
@@ -143,7 +145,7 @@ export default function CreateCreatorAccountScreen({ navigation }: any) {
 
       const code = `D${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
-      const { error } = await supabase.from('consultant_profiles').upsert({
+      await upsertConsultantProfile({
         user_id: actualUserId,
         display_name: profile.name,
         code,
@@ -156,17 +158,9 @@ export default function CreateCreatorAccountScreen({ navigation }: any) {
         ifsc_code: ifsc.trim().toUpperCase(),
         bank_account_number: accountNumber.trim(),
         terms_pdf_url: termsPdfUrl,
-        is_approved: false,
-        is_active: true,
-      }, { onConflict: 'user_id', ignoreDuplicates: false });
+      });
 
-      if (error) {
-        Alert.alert('Error', error.message);
-        setSubmitting(false);
-        return;
-      }
-
-      await supabase.from('profiles').update({ has_consultant_profile: true }).eq('id', profile.id);
+      await updateProfile({ has_consultant_profile: true });
       await fetchConsultantProfile();
 
       navigation.navigate('ConsultantServicePricing', { fromOnboarding: true });

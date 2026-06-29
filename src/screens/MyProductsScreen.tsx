@@ -2,8 +2,8 @@
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Platform, ActivityIndicator, RefreshControl, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Plus, Package, Edit3, Trash2, Eye, EyeOff } from 'lucide-react-native';
-import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
+import { fetchConsultantProducts, updateShopProduct, deleteShopProduct } from '../services/shopService';
 import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
 
 
@@ -29,14 +29,8 @@ export default function MyProductsScreen({ navigation }: any) {
   async function fetchProducts() {
     if (!consultantProfile?.id) { setLoading(false); return; }
     try {
-      const { data, error } = await supabase
-        .from('shop_products')
-        .select('*')
-        .eq('consultant_id', consultantProfile.id)
-        .order('created_at', { ascending: false });
-
-      if (!error && data) setProducts(data);
-      else setProducts([]);
+      const data = await fetchConsultantProducts(consultantProfile.id);
+      setProducts(data);
     } catch {
       setProducts([]);
     } finally {
@@ -47,16 +41,10 @@ export default function MyProductsScreen({ navigation }: any) {
   async function toggleActive(product: any) {
     const newState = !product.is_active;
     try {
-      const { error } = await supabase
-        .from('shop_products')
-        .update({ is_active: newState })
-        .eq('id', product.id);
-
-      if (!error) {
-        setProducts((prev) => prev.map((p) =>
-          p.id === product.id ? { ...p, is_active: newState } : p
-        ));
-      }
+      await updateShopProduct(product.id, { is_active: newState });
+      setProducts((prev) => prev.map((p) =>
+        p.id === product.id ? { ...p, is_active: newState } : p
+      ));
     } catch {}
   }
 
@@ -69,15 +57,8 @@ export default function MyProductsScreen({ navigation }: any) {
         {
           text: 'Delete', style: 'destructive', onPress: async () => {
             try {
-              const { error } = await supabase
-                .from('shop_products')
-                .delete()
-                .eq('id', product.id);
-              if (!error) {
-                setProducts((prev) => prev.filter((p) => p.id !== product.id));
-              } else {
-                Alert.alert('Error', error.message);
-              }
+              await deleteShopProduct(product.id);
+              setProducts((prev) => prev.filter((p) => p.id !== product.id));
             } catch {
               Alert.alert('Error', 'Failed to delete product');
             }

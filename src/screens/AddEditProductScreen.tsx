@@ -3,8 +3,8 @@ import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Image,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Camera, X, Check, Package } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
+import { updateShopProduct, createShopProduct } from '../services/shopService';
 import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
 
 const PRODUCT_CATEGORIES = [
@@ -123,21 +123,12 @@ export default function AddEditProductScreen({ navigation, route }: any) {
       };
 
       if (isEditing) {
-        const { error } = await supabase
-          .from('shop_products')
-          .update(productData)
-          .eq('id', existingProduct.id);
-
-        if (error) { Alert.alert('Error', error.message); return; }
+        await updateShopProduct(existingProduct.id, productData);
         Alert.alert('Updated', 'Product updated successfully.', [
           { text: 'OK', onPress: () => navigation.goBack() }
         ]);
       } else {
-        const { error } = await supabase
-          .from('shop_products')
-          .insert(productData);
-
-        if (error) { Alert.alert('Error', error.message); return; }
+        await createShopProduct(productData);
         Alert.alert('Published', 'Your product is now live in the shop!', [
           { text: 'OK', onPress: () => navigation.goBack() }
         ]);

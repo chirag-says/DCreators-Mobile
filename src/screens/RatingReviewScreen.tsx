@@ -2,9 +2,10 @@
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Platform, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Star, Send } from 'lucide-react-native';
-import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
 import { sendNotification } from '../lib/notifications';
+import { createReview } from '../services/projectService';
+import { fetchConsultantUserId } from '../services/consultantService';
 import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
 
 
@@ -37,7 +38,7 @@ export default function RatingReviewScreen({ navigation, route }: any) {
 
     setSubmitting(true);
     try {
-      const { error } = await supabase.from('reviews').insert({
+      await createReview({
         project_id: project.id,
         reviewer_id: profile.id,
         consultant_id: project.consultant_id || null,
@@ -46,23 +47,12 @@ export default function RatingReviewScreen({ navigation, route }: any) {
         tags: selectedTags.length > 0 ? selectedTags : null,
       });
 
-      if (error) {
-        Alert.alert('Error', error.message);
-        return;
-      }
-
       // Notify consultant
       if (project.consultant_id) {
-        // Need the user_id for the consultant
-        const { data: cp } = await supabase
-          .from('consultant_profiles')
-          .select('user_id')
-          .eq('id', project.consultant_id)
-          .single();
-
-        if (cp?.user_id) {
+        const consultantUserId = await fetchConsultantUserId(project.consultant_id);
+        if (consultantUserId) {
           sendNotification({
-            userId: cp.user_id,
+            userId: consultantUserId,
             title: `${rating}★ Review Received`,
             message: review.trim()
               ? `"${review.trim().substring(0, 80)}..."`

@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import TopHeader from '../components/TopHeader';
 import { ChevronDown, ChevronRight, Camera, Square, CheckSquare, X, ImagePlus, Save, ArrowLeft } from 'lucide-react-native';
 import { useAuthStore } from '../store/useAuthStore';
-import { supabase } from '../lib/supabase';
+import { updateConsultantProfileByUserId } from '../services/consultantService';
 import * as ImagePicker from 'expo-image-picker';
 import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
 
@@ -184,10 +184,7 @@ export default function EditConsultantProfileScreen({ navigation }: any) {
       console.log('[EditProfile] Updating for user_id:', profile.id);
 
       // Use user_id for matching — more reliable than consultant profile id
-      const { error, status } = await supabase
-        .from('consultant_profiles')
-        .update(updateData)
-        .eq('user_id', profile.id);
+      const { error, status } = await updateConsultantProfileByUserId(profile.id, updateData);
 
       console.log('[EditProfile] Status:', status, 'Error:', error);
 

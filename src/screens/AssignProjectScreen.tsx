@@ -29,7 +29,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronDown, Calendar, DollarSign, ArrowLeft } from 'lucide-react-native';
 import { useAuthStore } from '../store/useAuthStore';
-import { supabase } from '../lib/supabase';
+import { createProject } from '../services/projectService';
 import { colors, fonts, fontSizes, spacing, radii } from '../styles/theme';
 import { RemoteAssets } from '../lib/assets';
 
@@ -153,20 +153,7 @@ export default function AssignProjectScreen({ navigation, route }: any) {
       const status = consultant ? 'assigned' : 'draft';
       const payload = buildProjectPayload(status);
 
-      const { data, error } = await supabase
-        .from('projects')
-        .insert(payload)
-        .select()
-        .single();
-
-      if (error) {
-        if (error.code === '23503') {
-          Alert.alert('Error', 'Consultant profile not found. Please try again.');
-        } else {
-          Alert.alert('Error', error.message);
-        }
-        return;
-      }
+      const data = await createProject(payload);
 
       if (consultant) {
         // DIRECT HIRE: go to the unified Project Dashboard with assigned status
@@ -176,7 +163,11 @@ export default function AssignProjectScreen({ navigation, route }: any) {
         navigation.navigate('ConsultantMatching', { project: data });
       }
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Something went wrong.');
+      if (err?.code === '23503') {
+        Alert.alert('Error', 'Consultant profile not found. Please try again.');
+      } else {
+        Alert.alert('Error', err.message || 'Something went wrong.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -193,11 +184,7 @@ export default function AssignProjectScreen({ navigation, route }: any) {
     setIsSaving(true);
     try {
       const payload = buildProjectPayload('draft');
-      const { error } = await supabase.from('projects').insert(payload);
-      if (error) {
-        Alert.alert('Error', error.message);
-        return;
-      }
+      await createProject(payload);
       Alert.alert('Saved', 'Draft saved. You can return to it from your dashboard.', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);

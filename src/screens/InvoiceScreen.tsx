@@ -2,8 +2,8 @@
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Download, FileText } from 'lucide-react-native';
-import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
+import { fetchProjectPayments } from '../services/projectService';
 import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
 
 
@@ -21,14 +21,8 @@ export default function InvoiceScreen({ navigation, route }: any) {
 
   async function fetchPayments() {
     try {
-      const { data, error } = await supabase
-        .from('payments')
-        .select('*')
-        .eq('project_id', project.id)
-        .eq('status', 'completed')
-        .order('created_at', { ascending: true });
-
-      if (!error && data) setPayments(data);
+      const data = await fetchProjectPayments(project.id, 'completed');
+      setPayments(data);
     } catch {}
     finally { setLoading(false); }
   }

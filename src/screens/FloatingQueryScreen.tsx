@@ -3,9 +3,10 @@ import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Platfo
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Send, X, ChevronDown, Clock, MessageSquare, Plus } from 'lucide-react-native';
 import TopHeader from '../components/TopHeader';
-import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
 import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
+import { fetchFloatingQueries, createFloatingQuery } from '../services/floatingQueryService';
+import type { FloatingQuery } from '../types';
 
 
 const DISCIPLINES = ['Photography', 'Design', 'Videography', 'Sculpture', 'Artisan', 'Other'];
@@ -22,7 +23,7 @@ export default function FloatingQueryScreen({ navigation }: any) {
   const profile = useAuthStore((s) => s.profile);
   const currentRole = useAuthStore((s) => s.currentRole);
 
-  const [myQueries, setMyQueries] = useState<any[]>([]);
+  const [myQueries, setMyQueries] = useState<FloatingQuery[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
 
@@ -42,16 +43,11 @@ export default function FloatingQueryScreen({ navigation }: any) {
   async function fetchQueries() {
     if (!profile?.id) { setLoading(false); return; }
     try {
-      let query = supabase.from('floating_queries').select('*').order('created_at', { ascending: false });
-
-      if (currentRole === 'client') {
-        query = query.eq('client_id', profile.id);
-      } else {
-        query = query.eq('status', 'open');
-      }
-
-      const { data, error } = await query;
-      if (!error && data) setMyQueries(data);
+      const data = await fetchFloatingQueries({
+        role: currentRole === 'client' ? 'client' : 'consultant',
+        clientId: profile.id,
+      });
+      setMyQueries(data);
     } catch {}
     finally { setLoading(false); }
   }
@@ -66,17 +62,14 @@ export default function FloatingQueryScreen({ navigation }: any) {
     setIsSubmitting(true);
     try {
       const budgetVals = BUDGET_VALUES[budgetRange] || { min: 0, max: 0 };
-      const { error } = await supabase.from('floating_queries').insert({
+      await createFloatingQuery({
         client_id: profile.id,
         assignment_type: discipline.toLowerCase(),
         assignment_brief: brief,
         budget_min: budgetVals.min,
         budget_max: budgetVals.max,
         deadline: deadline || null,
-        status: 'open',
       });
-
-      if (error) { Alert.alert('Error', error.message); setIsSubmitting(false); return; }
 
       Alert.alert('✅ Query Floated!', 'Your query is now visible to consultants. You\'ll be notified when someone responds.');
       setShowForm(false);

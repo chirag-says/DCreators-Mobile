@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Package, Truck, CheckCircle2 } from 'lucide-react-native';
-import { supabase } from '../lib/supabase';
+import { fetchArtworkOrderById, updateArtworkOrderStatus } from '../services/artworkService';
 import { sendNotification } from '../lib/notifications';
 import { colors, fonts, fontSizes, spacing, radii } from '../styles/theme';
 import type { ArtworkOrder } from '../types';
@@ -35,13 +35,12 @@ export default function ArtistOrderDispatchScreen({ navigation, route }: any) {
     if (!orderId) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('artwork_orders')
-        .select('*, shop_products(title,images,category,price), buyer_profile:profiles!buyer_id(name,avatar_url)')
-        .eq('id', orderId).single();
-      if (error) throw error;
-      setOrder(data as ArtworkOrder);
-      setConsignNo((data as ArtworkOrder).consignment_no ?? '');
+      const data = await fetchArtworkOrderById(
+        orderId,
+        '*, shop_products(title,images,category,price), buyer_profile:profiles!buyer_id(name,avatar_url)'
+      );
+      setOrder(data);
+      setConsignNo(data.consignment_no ?? '');
     } catch (e: any) { Alert.alert('Error', e.message); }
     finally { setLoading(false); }
   }
@@ -51,11 +50,7 @@ export default function ArtistOrderDispatchScreen({ navigation, route }: any) {
     if (!order) return;
     setSaving(true);
     try {
-      await supabase.from('artwork_orders').update({
-        status: 'dispatched',
-        consignment_no: consignNo.trim(),
-        updated_at: new Date().toISOString(),
-      }).eq('id', order.id);
+      await updateArtworkOrderStatus(order.id, 'dispatched', { consignment_no: consignNo.trim() });
 
       sendNotification({
         userId: order.buyer_id,

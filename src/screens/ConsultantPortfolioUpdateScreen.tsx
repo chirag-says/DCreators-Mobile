@@ -18,9 +18,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Bell, Upload, X, Save, Edit3, Send, ChevronDown } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { supabase } from '../lib/supabase';
 import { uploadToCloudinary } from '../lib/cloudinary';
 import { useAuthStore } from '../store/useAuthStore';
+import { fetchConsultantProducts, updateShopProduct, createShopProduct } from '../services/shopService';
+import { syncConsultantPortfolioImages, approveConsultantProfile } from '../services/consultantService';
 import { colors, fonts, fontSizes, spacing } from '../styles/theme';
 import ImageCropModal, { CropVariants } from '../components/ImageCropModal';
 
@@ -88,13 +89,8 @@ export default function ConsultantPortfolioUpdateScreen({ navigation, route }: a
     if (!consultantProfile?.id) { setLoading(false); return; }
     setLoading(true);
     try {
-      const { data } = await supabase
-        .from('shop_products')
-        .select('*')
-        .eq('consultant_id', consultantProfile.id)
-        .order('created_at', { ascending: false })
-        .limit(MAX_SLOTS);
-      setExisting(data ?? []);
+      const data = await fetchConsultantProducts(consultantProfile.id, MAX_SLOTS);
+      setExisting(data);
     } catch {}
     finally { setLoading(false); }
   }
@@ -160,10 +156,10 @@ export default function ConsultantPortfolioUpdateScreen({ navigation, route }: a
       };
 
       if (slot.id) {
-        await supabase.from('shop_products').update(payload).eq('id', slot.id);
+        await updateShopProduct(slot.id, payload);
       } else {
-        const { data } = await supabase.from('shop_products').insert({ ...payload, created_at: new Date().toISOString() }).select().single();
-        if (data) updateSlot(idx, { id: data.id });
+        const data = await createShopProduct(payload);
+        updateSlot(idx, { id: data.id });
       }
 
       Alert.alert('Saved ✅', 'Artwork saved to portfolio.');
@@ -180,22 +176,7 @@ export default function ConsultantPortfolioUpdateScreen({ navigation, route }: a
   // banner respectively.
   async function syncProfilePortfolioImages() {
     if (!consultantProfile?.id) return;
-    const { data } = await supabase
-      .from('shop_products')
-      .select('images, image_variants')
-      .eq('consultant_id', consultantProfile.id)
-      .order('created_at', { ascending: false })
-      .limit(MAX_SLOTS);
-    const rows = data ?? [];
-    const squareImages = rows.map((p: any) => p.image_variants?.square ?? p.images?.[0]).filter(Boolean);
-    const primary = rows[0];
-    const cardImage = primary?.image_variants?.card ?? primary?.images?.[0] ?? null;
-    const bannerImage = primary?.image_variants?.banner ?? primary?.images?.[0] ?? null;
-    await supabase.from('consultant_profiles').update({
-      portfolio_images: squareImages,
-      portfolio_card_image: cardImage,
-      portfolio_banner_image: bannerImage,
-    }).eq('id', consultantProfile.id);
+    await syncConsultantPortfolioImages(consultantProfile.id, MAX_SLOTS);
   }
 
   async function handleSubmitAll() {
@@ -205,7 +186,7 @@ export default function ConsultantPortfolioUpdateScreen({ navigation, route }: a
     await syncProfilePortfolioImages();
 
     if (fromOnboarding && consultantProfile?.id) {
-      await supabase.from('consultant_profiles').update({ is_approved: true }).eq('id', consultantProfile.id);
+      await approveConsultantProfile(consultantProfile.id);
       await fetchConsultantProfile();
       Alert.alert(
         'Profile Submitted 🎉',

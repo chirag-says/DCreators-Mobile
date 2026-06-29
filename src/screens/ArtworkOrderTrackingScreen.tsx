@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Package, Truck, CheckCircle2, Clock, CreditCard, Star } from 'lucide-react-native';
-import { supabase } from '../lib/supabase';
+import { fetchArtworkOrderById, updateArtworkOrderStatus } from '../services/artworkService';
 import { sendNotification } from '../lib/notifications';
 import { colors, fonts, fontSizes, spacing, radii } from '../styles/theme';
 import type { ArtworkOrder, ArtworkOrderStatus } from '../types';
@@ -45,12 +45,11 @@ export default function ArtworkOrderTrackingScreen({ navigation, route }: any) {
     if (!orderId) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('artwork_orders')
-        .select('*, shop_products(title,images,category,price,description), artist_profile:profiles!artist_id(name,avatar_url)')
-        .eq('id', orderId).single();
-      if (error) throw error;
-      setOrder(data as ArtworkOrder);
+      const data = await fetchArtworkOrderById(
+        orderId,
+        '*, shop_products(title,images,category,price,description), artist_profile:profiles!artist_id(name,avatar_url)'
+      );
+      setOrder(data);
     } catch (e: any) { Alert.alert('Error', e.message); }
     finally { setLoading(false); }
   }
@@ -62,7 +61,7 @@ export default function ArtworkOrderTrackingScreen({ navigation, route }: any) {
       { text: 'Confirm', onPress: async () => {
         setConfirming(true);
         try {
-          await supabase.from('artwork_orders').update({ status: 'delivered', updated_at: new Date().toISOString() }).eq('id', order.id);
+          await updateArtworkOrderStatus(order.id, 'delivered');
           sendNotification({ userId: order.artist_id, title: '✅ Delivery Confirmed!', message: 'Buyer confirmed receipt. Balance will be released.', type: 'payment' });
           Alert.alert('Delivery Confirmed!', 'Please proceed to pay the balance.', [
             { text: 'Pay Balance', onPress: () => navigation.replace('ArtworkPayment', { order: { ...order, status: 'delivered' }, paymentType: 'balance' }) },

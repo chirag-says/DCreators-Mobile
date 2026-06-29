@@ -47,8 +47,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           user: { id: session.user.id, email: session.user.email ?? '' },
         });
         // Fetch profile data
-        await get().fetchProfile();
-        await get().fetchConsultantProfile();
+        await Promise.all([get().fetchProfile(), get().fetchConsultantProfile()]);
       }
     } catch (err) {
       console.error('Auth init error:', err);
@@ -103,8 +102,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           user: { id: data.user.id, email: data.user.email ?? '' },
         });
         // Profile is auto-created by DB trigger, fetch it
-        await get().fetchProfile();
-        await get().fetchConsultantProfile();
+        await Promise.all([get().fetchProfile(), get().fetchConsultantProfile()]);
       }
 
       return { success: true };

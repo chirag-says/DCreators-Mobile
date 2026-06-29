@@ -1,6 +1,8 @@
-﻿/**
+/**
  * HistoryScreen — role-aware project history
  * Matches Figma: "My History Dashboard.png" (consultant variant)
+ * Virtualized with FlatList for the project list; static header/footer
+ * handled via ListHeaderComponent / ListFooterComponent.
  *
  * Consultant ("Sales History"):
  * - Sales / Projects tab toggle, Artwork Sales section, Overall Earnings
@@ -10,11 +12,11 @@
  *   a client never sells anything, so "Sales History" / earnings / reviews
  *   ABOUT them don't apply.
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
-  ScrollView,
+  FlatList,
   StyleSheet,
   TouchableOpacity,
   RefreshControl,
@@ -35,6 +37,70 @@ const TEAL = '#2D8B7F';
 const EARNINGS_BG = '#1A2C4E';
 
 type TabKey = 'sales' | 'projects';
+
+/* ── Memoized row component for the project list ────────────── */
+const HistoryProjectRow = React.memo(function HistoryProjectRow({
+  project,
+  isConsultant,
+  formatDate,
+  formatAmount,
+}: {
+  project: Project;
+  isConsultant: boolean;
+  formatDate: (d: string) => string;
+  formatAmount: (n: number) => string;
+}) {
+  return (
+    <View style={styles.salesItem}>
+      <View style={styles.salesItemIcon}>
+        <PenTool size={16} color={TEAL} />
+      </View>
+      <View style={styles.salesItemInfo}>
+        <Text style={styles.salesItemName} numberOfLines={1}>
+          {project.assignment_type || 'Creative Project'}
+        </Text>
+        <Text style={styles.salesItemDate}>
+          {project.status === 'completed' ? 'Completed' : (isConsultant ? 'Sold' : 'Updated')} on {formatDate(project.updated_at)}
+        </Text>
+      </View>
+      <View style={styles.salesItemRight}>
+        <Text style={styles.salesItemAmount}>{formatAmount(project.budget)}</Text>
+        <View style={[
+          styles.statusBadge,
+          { backgroundColor: project.status === 'completed' ? '#DCFCE7' : '#FEF3C7' }
+        ]}>
+          <Text style={[
+            styles.statusBadgeText,
+            { color: project.status === 'completed' ? '#16A34A' : '#D97706' }
+          ]}>
+            {project.status === 'completed' ? 'Completed' : project.status.charAt(0).toUpperCase() + project.status.slice(1)}
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+});
+
+/* ── Memoized review row ─────────────────────────────────────── */
+const ReviewRow = React.memo(function ReviewRow({ r }: { r: any }) {
+  return (
+    <View style={styles.feedbackItem}>
+      <View style={[styles.feedbackAvatar, { backgroundColor: '#E8F4FE' }]}>
+        <Text style={styles.feedbackInitials}>
+          {r.profiles?.name ? r.profiles.name.substring(0, 2).toUpperCase() : '??'}
+        </Text>
+      </View>
+      <View style={styles.feedbackContent}>
+        <Text style={styles.feedbackQuote}>
+          {r.review_text ? `"${r.review_text}"` : '(No text review)'}
+        </Text>
+        <Text style={styles.feedbackAuthor}>
+          {'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)} — {r.profiles?.name || 'Client'}
+        </Text>
+      </View>
+    </View>
+  );
+});
 
 export default function HistoryScreen({ navigation }: any) {
   const profile = useAuthStore((s) => s.profile);
@@ -113,147 +179,121 @@ export default function HistoryScreen({ navigation }: any) {
     );
   }
 
+  const renderProjectRow = useCallback(({ item }: { item: Project }) => (
+    <HistoryProjectRow
+      project={item}
+      isConsultant={isConsultant}
+      formatDate={formatDate}
+      formatAmount={formatAmount}
+    />
+  ), [isConsultant]);
+
+  const listHeader = useMemo(() => (
+    <>
+      {/* ── Title ──────────────────────────────── */}
+      <Text style={styles.title}>{isConsultant ? 'Sales History' : 'My Projects'}</Text>
+      <Text style={styles.subtitle}>
+        {isConsultant
+          ? 'Track your artistic legacy and consultant milestones across the Dcreators ecosystem.'
+          : 'Track the status and progress of every project and artwork you\'ve commissioned.'}
+      </Text>
+
+      {/* ── Tab Toggle ─────────────────────────── */}
+      <View style={styles.tabRow}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'sales' && styles.tabActive]}
+          onPress={() => setActiveTab('sales')}
+        >
+          <Text style={[styles.tabText, activeTab === 'sales' && styles.tabTextActive]}>
+            {isConsultant ? 'Sales' : 'Completed'}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'projects' && styles.tabActive]}
+          onPress={() => setActiveTab('projects')}
+        >
+          <Text style={[styles.tabText, activeTab === 'projects' && styles.tabTextActive]}>All</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* ── Section header for project/sales list ─ */}
+      <View style={styles.salesSection}>
+        <View style={styles.salesHeader}>
+          <View style={styles.salesHeaderLeft}>
+            <Palette size={18} color={NAVY} />
+            <Text style={styles.salesTitle}>
+              {isConsultant
+                ? (activeTab === 'sales' ? 'Artwork Sales' : 'All Projects')
+                : (activeTab === 'sales' ? 'Completed Projects' : 'All Projects')}
+            </Text>
+          </View>
+          <Text style={styles.salesTotalBadge}>
+            Total: {formatAmount(displayProjects.reduce((sum, p) => sum + p.budget, 0))}
+          </Text>
+        </View>
+      </View>
+    </>
+  ), [isConsultant, activeTab, displayProjects]);
+
+  const listFooter = useMemo(() => {
+    if (!isConsultant) return null;
+    return (
+      <>
+        {/* ── Overall Earnings + Recent Feedback ───
+             Seller-side concepts — a client never sells anything or
+             gets reviewed, so neither applies to them. */}
+        <View style={styles.earningsCard}>
+          <Text style={styles.earningsLabel}>OVERALL EARNINGS</Text>
+          <Text style={styles.earningsAmount}>{formatAmount(earnings.total)}</Text>
+          <View style={styles.growthBadge}>
+            <TrendingUp size={14} color="#fff" />
+            <Text style={styles.growthText}>
+              {earnings.thisMonth > 0 ? `₹${(earnings.thisMonth / 1000).toFixed(0)}K` : '0'} this month
+            </Text>
+          </View>
+          <View style={styles.earningsSplit}>
+            <View>
+              <Text style={styles.splitLabel}>ART SALES</Text>
+              <Text style={styles.splitValue}>{formatAmount(Math.floor(earnings.total * 0.52))}</Text>
+            </View>
+            <View>
+              <Text style={styles.splitLabel}>PROJECTS</Text>
+              <Text style={styles.splitValue}>{formatAmount(Math.floor(earnings.total * 0.48))}</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.feedbackSection}>
+          <Text style={styles.feedbackTitle}>Recent Feedback</Text>
+          {reviews.length === 0 ? (
+            <Text style={styles.emptyText}>No reviews yet</Text>
+          ) : (
+            reviews.map((r) => <ReviewRow key={r.id} r={r} />)
+          )}
+        </View>
+      </>
+    );
+  }, [isConsultant, earnings, reviews]);
+
   return (
     <View style={styles.bg}>
       <SafeAreaView style={styles.safe} edges={['top']}>
         <TopHeader />
-        <ScrollView
+        <FlatList
           contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-        >
-          {/* ── Title ──────────────────────────────── */}
-          <Text style={styles.title}>{isConsultant ? 'Sales History' : 'My Projects'}</Text>
-          <Text style={styles.subtitle}>
-            {isConsultant
-              ? 'Track your artistic legacy and consultant milestones across the Dcreators ecosystem.'
-              : 'Track the status and progress of every project and artwork you\'ve commissioned.'}
-          </Text>
-
-          {/* ── Tab Toggle ─────────────────────────── */}
-          <View style={styles.tabRow}>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'sales' && styles.tabActive]}
-              onPress={() => setActiveTab('sales')}
-            >
-              <Text style={[styles.tabText, activeTab === 'sales' && styles.tabTextActive]}>
-                {isConsultant ? 'Sales' : 'Completed'}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'projects' && styles.tabActive]}
-              onPress={() => setActiveTab('projects')}
-            >
-              <Text style={[styles.tabText, activeTab === 'projects' && styles.tabTextActive]}>All</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* ── Project/sales list ─────────────────── */}
-          <View style={styles.salesSection}>
-            <View style={styles.salesHeader}>
-              <View style={styles.salesHeaderLeft}>
-                <Palette size={18} color={NAVY} />
-                <Text style={styles.salesTitle}>
-                  {isConsultant
-                    ? (activeTab === 'sales' ? 'Artwork Sales' : 'All Projects')
-                    : (activeTab === 'sales' ? 'Completed Projects' : 'All Projects')}
-                </Text>
-              </View>
-              <Text style={styles.salesTotalBadge}>
-                Total: {formatAmount(displayProjects.reduce((sum, p) => sum + p.budget, 0))}
-              </Text>
+          data={displayProjects}
+          keyExtractor={(item) => item.id}
+          renderItem={renderProjectRow}
+          ListHeaderComponent={listHeader}
+          ListFooterComponent={listFooter}
+          ListEmptyComponent={
+            <View style={styles.emptySection}>
+              <Text style={styles.emptyText}>No {activeTab === 'sales' ? (isConsultant ? 'sales' : 'completed') : 'project'} history yet</Text>
             </View>
-
-            {displayProjects.length === 0 ? (
-              <View style={styles.emptySection}>
-                <Text style={styles.emptyText}>No {activeTab === 'sales' ? (isConsultant ? 'sales' : 'completed') : 'project'} history yet</Text>
-              </View>
-            ) : (
-              displayProjects.slice(0, 10).map((project) => (
-                <View key={project.id} style={styles.salesItem}>
-                  <View style={styles.salesItemIcon}>
-                    <PenTool size={16} color={TEAL} />
-                  </View>
-                  <View style={styles.salesItemInfo}>
-                    <Text style={styles.salesItemName} numberOfLines={1}>
-                      {project.assignment_type || 'Creative Project'}
-                    </Text>
-                    <Text style={styles.salesItemDate}>
-                      {project.status === 'completed' ? 'Completed' : (isConsultant ? 'Sold' : 'Updated')} on {formatDate(project.updated_at)}
-                    </Text>
-                  </View>
-                  <View style={styles.salesItemRight}>
-                    <Text style={styles.salesItemAmount}>{formatAmount(project.budget)}</Text>
-                    <View style={[
-                      styles.statusBadge,
-                      { backgroundColor: project.status === 'completed' ? '#DCFCE7' : '#FEF3C7' }
-                    ]}>
-                      <Text style={[
-                        styles.statusBadgeText,
-                        { color: project.status === 'completed' ? '#16A34A' : '#D97706' }
-                      ]}>
-                        {project.status === 'completed' ? 'Completed' : project.status.charAt(0).toUpperCase() + project.status.slice(1)}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              ))
-            )}
-          </View>
-
-          {/* ── Overall Earnings + Recent Feedback ───
-               Seller-side concepts — a client never sells anything or
-               gets reviewed, so neither applies to them. */}
-          {isConsultant && (
-            <>
-              <View style={styles.earningsCard}>
-                <Text style={styles.earningsLabel}>OVERALL EARNINGS</Text>
-                <Text style={styles.earningsAmount}>{formatAmount(earnings.total)}</Text>
-                <View style={styles.growthBadge}>
-                  <TrendingUp size={14} color="#fff" />
-                  <Text style={styles.growthText}>
-                    {earnings.thisMonth > 0 ? `₹${(earnings.thisMonth / 1000).toFixed(0)}K` : '0'} this month
-                  </Text>
-                </View>
-                <View style={styles.earningsSplit}>
-                  <View>
-                    <Text style={styles.splitLabel}>ART SALES</Text>
-                    <Text style={styles.splitValue}>{formatAmount(Math.floor(earnings.total * 0.52))}</Text>
-                  </View>
-                  <View>
-                    <Text style={styles.splitLabel}>PROJECTS</Text>
-                    <Text style={styles.splitValue}>{formatAmount(Math.floor(earnings.total * 0.48))}</Text>
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.feedbackSection}>
-                <Text style={styles.feedbackTitle}>Recent Feedback</Text>
-                {reviews.length === 0 ? (
-                  <Text style={styles.emptyText}>No reviews yet</Text>
-                ) : (
-                  reviews.map((r) => (
-                    <View key={r.id} style={styles.feedbackItem}>
-                      <View style={[styles.feedbackAvatar, { backgroundColor: '#E8F4FE' }]}>
-                        <Text style={styles.feedbackInitials}>
-                          {r.profiles?.name ? r.profiles.name.substring(0, 2).toUpperCase() : '??'}
-                        </Text>
-                      </View>
-                      <View style={styles.feedbackContent}>
-                        <Text style={styles.feedbackQuote}>
-                          {r.review_text ? `"${r.review_text}"` : '(No text review)'}
-                        </Text>
-                        <Text style={styles.feedbackAuthor}>
-                          {'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)} — {r.profiles?.name || 'Client'}
-                        </Text>
-                      </View>
-                    </View>
-                  ))
-                )}
-              </View>
-            </>
-          )}
-        </ScrollView>
+          }
+        />
       </SafeAreaView>
     </View>
   );

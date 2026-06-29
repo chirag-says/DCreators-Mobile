@@ -16,11 +16,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Send } from 'lucide-react-native';
-import { supabase } from '../lib/supabase';
 import { sendNotification } from '../lib/notifications';
 import { useAuthStore } from '../store/useAuthStore';
 import { colors, fonts, fontSizes, spacing, radii } from '../styles/theme';
 import MonthCalendar from '../components/MonthCalendar';
+import { fetchConsultantTakenDates } from '../services/consultantScheduleService';
+import { createProject } from '../services/projectService';
 
 const NAVY = '#1B3A5C';
 const TEAL = '#3D9B8F';
@@ -53,11 +54,8 @@ export default function BookConsultantScreen({ navigation, route }: any) {
     if (!consultant?.user_id) { setLoadingDates(false); return; }
     setLoadingDates(true);
     try {
-      const { data, error } = await supabase.rpc('get_consultant_taken_dates', {
-        p_consultant_user_id: consultant.user_id,
-      });
-      if (error) throw error;
-      setTakenDates(new Set((data ?? []).map((row: any) => row.taken_date)));
+      const data = await fetchConsultantTakenDates(consultant.user_id);
+      setTakenDates(new Set(data));
     } catch (e: any) {
       console.warn('[BookConsultant] taken-dates fetch error:', e.message);
       setTakenDates(new Set());
@@ -78,32 +76,19 @@ export default function BookConsultantScreen({ navigation, route }: any) {
 
     setSubmitting(true);
     try {
-      const { data, error } = await supabase
-        .from('projects')
-        .insert({
-          client_id: profile.id,
-          consultant_id: consultant.user_id,
-          assignment_type: `Hire ${categoryLabel}`,
-          assignment_details: null,
-          assignment_brief: brief.trim(),
-          budget: budgetNum,
-          event_date: selectedDate,
-          status: 'assigned',
-          progress_percent: 0,
-          work_order_data: null,
-          final_offer: null,
-        })
-        .select()
-        .single();
-
-      if (error) {
-        if (error.code === '23503') {
-          Alert.alert('Error', 'Consultant profile not found. Please try again.');
-        } else {
-          Alert.alert('Error', error.message);
-        }
-        return;
-      }
+      const data = await createProject({
+        client_id: profile.id,
+        consultant_id: consultant.user_id,
+        assignment_type: `Hire ${categoryLabel}`,
+        assignment_details: null,
+        assignment_brief: brief.trim(),
+        budget: budgetNum,
+        event_date: selectedDate,
+        status: 'assigned',
+        progress_percent: 0,
+        work_order_data: null,
+        final_offer: null,
+      });
 
       sendNotification({
         userId: consultant.user_id,
@@ -114,7 +99,11 @@ export default function BookConsultantScreen({ navigation, route }: any) {
 
       navigation.navigate('Main', { screen: 'CreatorWorkorder', params: { project: data } });
     } catch (e: any) {
-      Alert.alert('Error', e.message ?? 'Something went wrong.');
+      if (e?.code === '23503') {
+        Alert.alert('Error', 'Consultant profile not found. Please try again.');
+      } else {
+        Alert.alert('Error', e.message ?? 'Something went wrong.');
+      }
     } finally {
       setSubmitting(false);
     }

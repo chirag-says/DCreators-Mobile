@@ -17,10 +17,11 @@ import {
   MoreVertical, Edit3, ChevronLeft, ChevronRight,
   Plus, Save,
 } from 'lucide-react-native';
-import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
 import { colors, fonts, fontSizes, spacing, radii } from '../styles/theme';
 import type { Project } from '../types';
+import { fetchConsultantOngoingProjects, fetchConsultantDeliveredProjects } from '../services/projectService';
+import { fetchBlockedDates as fetchBlockedDatesService, addBlockedDate, removeBlockedDate, createProjectNote } from '../services/consultantScheduleService';
 import TopHeader from '../components/TopHeader';
 
 const NAVY   = '#1B3A5C';
@@ -74,11 +75,8 @@ export default function ConsultantProjectManagementScreen({ navigation }: any) {
   async function fetchBlockedDates() {
     if (!consultantProfile?.id) return;
     try {
-      const { data } = await supabase
-        .from('consultant_blocked_dates')
-        .select('blocked_date')
-        .eq('consultant_id', consultantProfile.id);
-      setBlockedDates(new Set((data ?? []).map((row: any) => row.blocked_date)));
+      const data = await fetchBlockedDatesService(consultantProfile.id);
+      setBlockedDates(new Set(data));
     } catch {}
   }
 
@@ -92,14 +90,10 @@ export default function ConsultantProjectManagementScreen({ navigation }: any) {
     const isBlocked = blockedDates.has(key);
     try {
       if (isBlocked) {
-        await supabase.from('consultant_blocked_dates')
-          .delete()
-          .eq('consultant_id', consultantProfile.id)
-          .eq('blocked_date', key);
+        await removeBlockedDate(consultantProfile.id, key);
         setBlockedDates(prev => { const next = new Set(prev); next.delete(key); return next; });
       } else {
-        await supabase.from('consultant_blocked_dates')
-          .insert({ consultant_id: consultantProfile.id, blocked_date: key });
+        await addBlockedDate(consultantProfile.id, key);
         setBlockedDates(prev => new Set(prev).add(key));
       }
     } catch (e: any) {
@@ -116,24 +110,12 @@ export default function ConsultantProjectManagementScreen({ navigation }: any) {
     if (!consultantProfile?.user_id) { setLoading(false); return; }
     setLoading(true);
     try {
-      const ONGOING_STATUSES = ['work_order_accepted','in_progress','review_1','review_2','final_review','final_approved','balance_pending','balance_paid'];
-      const { data: onData } = await supabase
-        .from('projects')
-        .select('*, client:profiles!client_id(name)')
-        .eq('consultant_id', consultantProfile.user_id)
-        .in('status', ONGOING_STATUSES)
-        .order('created_at', { ascending: false });
-
-      const { data: delData } = await supabase
-        .from('projects')
-        .select('*, client:profiles!client_id(name)')
-        .eq('consultant_id', consultantProfile.user_id)
-        .in('status', ['delivered','completed'])
-        .order('updated_at', { ascending: false })
-        .limit(10);
-
-      setOngoing(onData  ?? []);
-      setDelivered(delData ?? []);
+      const [onData, delData] = await Promise.all([
+        fetchConsultantOngoingProjects(consultantProfile.user_id),
+        fetchConsultantDeliveredProjects(consultantProfile.user_id),
+      ]);
+      setOngoing(onData);
+      setDelivered(delData);
     } catch {}
     finally { setLoading(false); }
   }
@@ -143,14 +125,12 @@ export default function ConsultantProjectManagementScreen({ navigation }: any) {
     if (!consultantProfile?.user_id) return;
     setFormSaving(true);
     try {
-      const { error } = await supabase.from('consultant_project_notes').insert({
+      await createProjectNote({
         consultant_id: consultantProfile.user_id,
         title: formTitle.trim(),
         client_name: formClient.trim() || null,
         target_date: formDate || null,
-        created_at: new Date().toISOString(),
       });
-      if (error) throw error;
       setFormTitle(''); setFormDate(''); setFormClient('');
       setShowForm(false);
       Alert.alert('Added', 'Project note created.');

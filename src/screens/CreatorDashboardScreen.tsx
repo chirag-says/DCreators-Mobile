@@ -15,11 +15,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Edit3, Trash2, Plus, Briefcase } from 'lucide-react-native';
-import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
 import { colors, fonts, fontSizes, spacing, radii } from '../styles/theme';
 import ConsultantDashboard from '../components/dashboard/ConsultantDashboard';
 import TopHeader from '../components/TopHeader';
+import { fetchConsultantProducts, deleteShopProduct } from '../services/shopService';
+import { fetchConsultantDashboardProjects } from '../services/projectService';
 
 const NAVY   = '#1B3A5C';
 const ORANGE = '#E87B35';
@@ -53,12 +54,8 @@ export default function CreatorDashboardScreen({ navigation }: any) {
   async function fetchProducts() {
     if (!consultantProfile?.id) { setLoading(false); return; }
     try {
-      const { data } = await supabase
-        .from('shop_products')
-        .select('*')
-        .eq('consultant_id', consultantProfile.id)
-        .order('created_at', { ascending: false });
-      setProducts(data ?? []);
+      const data = await fetchConsultantProducts(consultantProfile.id);
+      setProducts(data);
     } catch { setProducts([]); }
     finally { setLoading(false); }
   }
@@ -67,13 +64,8 @@ export default function CreatorDashboardScreen({ navigation }: any) {
     const userId = consultantProfile?.user_id ?? profile?.id;
     if (!userId) return;
     try {
-      const { data } = await supabase
-        .from('projects')
-        .select('*, profiles!client_id(name, avatar_url)')
-        .eq('consultant_id', userId)
-        .in('status', ['assigned', 'advance_pending', 'advance_paid', 'work_order_generated', 'work_order_accepted', 'in_progress', 'review_1', 'review_2', 'final_review'])
-        .order('created_at', { ascending: false });
-      setProjects(data ?? []);
+      const data = await fetchConsultantDashboardProjects(userId);
+      setProjects(data);
     } catch { setProjects([]); }
   }
 
@@ -81,7 +73,7 @@ export default function CreatorDashboardScreen({ navigation }: any) {
     Alert.alert('Delete Product', `Delete "${p.title}"?`, [
       { text: 'Cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
-        await supabase.from('shop_products').delete().eq('id', p.id);
+        await deleteShopProduct(p.id);
         setProducts(prev => prev.filter(x => x.id !== p.id));
       }},
     ]);

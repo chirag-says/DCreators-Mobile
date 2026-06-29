@@ -2,8 +2,7 @@
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Platform, Image, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TopHeader from '../components/TopHeader';
-import { supabase } from '../lib/supabase';
-import { updateProjectStatus } from '../services/projectService';
+import { updateProjectStatus, fetchLatestSubmission, updateSubmissionFeedback } from '../services/projectService';
 import { sendNotification } from '../lib/notifications';
 import { ArrowLeft, Check, RotateCcw, Pause, X, MessageSquare } from 'lucide-react-native';
 import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
@@ -34,14 +33,7 @@ export default function ClientReviewScreen({ navigation, route }: any) {
     if (!project?.id) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('submissions')
-        .select('*')
-        .eq('project_id', project.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-      if (error && error.code !== 'PGRST116') console.log('[Review] fetch:', error.message);
+      const data = await fetchLatestSubmission(project.id);
       if (data) { setSubmission(data); setSelectedOption(data.selected_option || null); }
     } catch (err) { console.log('[Review]', err); }
     finally { setLoading(false); }
@@ -54,10 +46,10 @@ export default function ClientReviewScreen({ navigation, route }: any) {
       { text: 'Approve', onPress: async () => {
         setIsSaving(true);
         try {
-          await supabase.from('submissions').update({
+          await updateSubmissionFeedback(submission.id, {
             client_action: 'approve',
             selected_option: selectedOption || 1,
-          }).eq('id', submission.id);
+          });
 
           // round-specific next status: review_1→review_2, review_2→final_review, final→final_approved
           const nextStatus = APPROVE_NEXT[submission.round] as any;
@@ -100,13 +92,13 @@ export default function ClientReviewScreen({ navigation, route }: any) {
     }
     setIsSaving(true);
     try {
-      await supabase.from('submissions').update({
+      await updateSubmissionFeedback(submission.id, {
         client_action: 'revert',
         feedback_colour: colourChecked,
         feedback_concept: conceptChecked,
         feedback_design_look: designChecked,
         feedback_text: feedbackText || null,
-      }).eq('id', submission.id);
+      });
 
       // Any review round → in_progress on revert
       await updateProjectStatus(project.id, 'in_progress');
@@ -133,7 +125,7 @@ export default function ClientReviewScreen({ navigation, route }: any) {
     // Hold: freeze review, no status change
     setIsSaving(true);
     try {
-      await supabase.from('submissions').update({ client_action: 'hold' }).eq('id', submission.id);
+      await updateSubmissionFeedback(submission.id, { client_action: 'hold' });
       Alert.alert('On Hold', 'Review paused. Project stays at current status.',
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );

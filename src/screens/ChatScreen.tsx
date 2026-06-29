@@ -1,11 +1,38 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform, ScrollView, KeyboardAvoidingView, ActivityIndicator, Alert } from 'react-native';
+﻿import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform, FlatList, KeyboardAvoidingView, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Send, Paperclip, Check, X } from 'lucide-react-native';
-import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
 import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
 import { acceptBidCandidate, declineBidCandidate } from '../services/bidService';
+import {
+  fetchMessages as fetchMessagesService,
+  sendMessage,
+  subscribeToMessages,
+  unsubscribeFromMessages,
+  type Message,
+  type MessageScopeColumn,
+} from '../services/messageService';
+
+type ChatRow =
+  | { kind: 'header'; key: string; label: string }
+  | { kind: 'message'; key: string; msg: Message; isMe: boolean };
+
+const MessageBubble = React.memo(function MessageBubble({ msg, isMe }: { msg: Message; isMe: boolean }) {
+  return (
+    <View style={[styles.messageWrapper, isMe ? styles.messageMe : styles.messageThem]}>
+      <View style={[styles.messageBubble, isMe ? styles.bubbleMe : styles.bubbleThem]}>
+        <Text style={[styles.messageText, isMe && styles.messageTextMe]}>{msg.text}</Text>
+      </View>
+      <Text style={styles.timeText}>{formatTime(msg.created_at)}</Text>
+    </View>
+  );
+});
+
+function formatTime(dateStr: string) {
+  const d = new Date(dateStr);
+  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+}
 
 export default function ChatScreen({ navigation, route }: any) {
   const project = route?.params?.project;
@@ -15,51 +42,39 @@ export default function ChatScreen({ navigation, route }: any) {
   const quotedPrice: number | undefined = route?.params?.quotedPrice;
   const isBidMode = !!bidCandidateId;
   const entityId = isBidMode ? bidCandidateId : project?.id;
-  const entityColumn = isBidMode ? 'bid_candidate_id' : 'project_id';
+  const entityColumn: MessageScopeColumn = isBidMode ? 'bid_candidate_id' : 'project_id';
 
   const otherName = route?.params?.otherName || 'Participant';
   const profile = useAuthStore((s) => s.profile);
   const currentRole = useAuthStore((s) => s.currentRole);
 
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [deciding, setDeciding] = useState(false);
-  const scrollRef = useRef<ScrollView>(null);
+  const listRef = useRef<FlatList<ChatRow>>(null);
 
   useEffect(() => {
     fetchMessages();
     // Subscribe to new messages via realtime
-    const channel = supabase
-      .channel(`messages:${entityColumn}:${entityId}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'messages',
-        filter: `${entityColumn}=eq.${entityId}`,
-      }, (payload: any) => {
-        setMessages((prev) => [...prev, payload.new]);
-        setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
-      })
-      .subscribe();
+    const channel = subscribeToMessages(entityColumn, entityId, (message) => {
+      setMessages((prev) => [...prev, message]);
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
+    });
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { unsubscribeFromMessages(channel); };
   }, []);
 
   async function fetchMessages() {
     if (!entityId) { setLoading(false); return; }
     try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq(entityColumn, entityId)
-        .order('created_at', { ascending: true });
-      if (!error && data) setMessages(data);
+      const data = await fetchMessagesService(entityColumn, entityId);
+      setMessages(data);
     } catch {}
     finally {
       setLoading(false);
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 200);
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 200);
     }
   }
 
@@ -69,14 +84,9 @@ export default function ChatScreen({ navigation, route }: any) {
     setInput('');
     setSending(true);
     try {
-      const { error } = await supabase.from('messages').insert({
-        [entityColumn]: entityId,
-        sender_id: profile.id,
-        text,
-      });
-      if (error) console.log('[Chat] Send error:', error.message);
+      await sendMessage({ scopeColumn: entityColumn, scopeId: entityId, senderId: profile.id, text });
       // Message will appear via realtime subscription
-    } catch {}
+    } catch (e: any) { console.log('[Chat] Send error:', e.message); }
     finally { setSending(false); }
   }
 
@@ -113,11 +123,6 @@ export default function ChatScreen({ navigation, route }: any) {
     ]);
   }
 
-  function formatTime(dateStr: string) {
-    const d = new Date(dateStr);
-    return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
-  }
-
   function formatDateHeader(dateStr: string) {
     const d = new Date(dateStr);
     const today = new Date();
@@ -128,18 +133,31 @@ export default function ChatScreen({ navigation, route }: any) {
     return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
   }
 
-  // Group messages by date
-  const groupedMessages: { date: string; msgs: any[] }[] = [];
-  let lastDate = '';
-  messages.forEach((msg) => {
-    const dateKey = new Date(msg.created_at).toDateString();
-    if (dateKey !== lastDate) {
-      groupedMessages.push({ date: dateKey, msgs: [msg] });
-      lastDate = dateKey;
-    } else {
-      groupedMessages[groupedMessages.length - 1].msgs.push(msg);
+  // Flatten messages into date-header + message rows for FlatList rendering
+  const rows = useMemo<ChatRow[]>(() => {
+    const out: ChatRow[] = [];
+    let lastDate = '';
+    messages.forEach((msg) => {
+      const dateKey = new Date(msg.created_at).toDateString();
+      if (dateKey !== lastDate) {
+        out.push({ kind: 'header', key: `header-${dateKey}`, label: formatDateHeader(msg.created_at) });
+        lastDate = dateKey;
+      }
+      out.push({ kind: 'message', key: msg.id, msg, isMe: msg.sender_id === profile?.id });
+    });
+    return out;
+  }, [messages, profile?.id]);
+
+  const renderRow = useCallback(({ item }: { item: ChatRow }) => {
+    if (item.kind === 'header') {
+      return (
+        <View style={styles.dateHeader}>
+          <Text style={styles.dateHeaderText}>{item.label}</Text>
+        </View>
+      );
     }
-  });
+    return <MessageBubble msg={item.msg} isMe={item.isMe} />;
+  }, []);
 
   const assignmentLabel = isBidMode
     ? `Negotiating · ₹${(quotedPrice ?? 0).toLocaleString('en-IN')}`
@@ -194,38 +212,21 @@ export default function ChatScreen({ navigation, route }: any) {
           {loading ? (
             <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 60 }} />
           ) : (
-            <ScrollView
-              ref={scrollRef}
+            <FlatList
+              ref={listRef}
               style={styles.chatScroll}
               contentContainerStyle={styles.chatContainer}
               showsVerticalScrollIndicator={false}
-              onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
-            >
-              {messages.length === 0 && (
+              data={rows}
+              keyExtractor={(item) => item.key}
+              renderItem={renderRow}
+              onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
+              ListEmptyComponent={
                 <View style={styles.emptyChat}>
                   <Text style={styles.emptyChatText}>No messages yet. Start the conversation! 💬</Text>
                 </View>
-              )}
-
-              {groupedMessages.map((group) => (
-                <View key={group.date}>
-                  <View style={styles.dateHeader}>
-                    <Text style={styles.dateHeaderText}>{formatDateHeader(group.msgs[0].created_at)}</Text>
-                  </View>
-                  {group.msgs.map((msg) => {
-                    const isMe = msg.sender_id === profile?.id;
-                    return (
-                      <View key={msg.id} style={[styles.messageWrapper, isMe ? styles.messageMe : styles.messageThem]}>
-                        <View style={[styles.messageBubble, isMe ? styles.bubbleMe : styles.bubbleThem]}>
-                          <Text style={[styles.messageText, isMe && styles.messageTextMe]}>{msg.text}</Text>
-                        </View>
-                        <Text style={styles.timeText}>{formatTime(msg.created_at)}</Text>
-                      </View>
-                    );
-                  })}
-                </View>
-              ))}
-            </ScrollView>
+              }
+            />
           )}
 
           {/* Input Area */}
@@ -288,7 +289,7 @@ const styles = StyleSheet.create({
   decisionBtnText: { color: '#fff', fontSize: fontSizes.sm + 1, fontWeight: '700', fontFamily: fonts.heavy },
 
   chatScroll: { flex: 1 },
-  chatContainer: { padding: spacing.lg, gap: spacing.sm, paddingBottom: spacing.xl },
+  chatContainer: { padding: spacing.lg, paddingBottom: spacing.xl },
 
   emptyChat: { alignItems: 'center', marginTop: 60, padding: spacing.xl },
   emptyChatText: { fontSize: fontSizes.base, color: colors.textTertiary, fontFamily: fonts.body, textAlign: 'center' },

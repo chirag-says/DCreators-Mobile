@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -185,7 +185,7 @@ export default function OTPVerificationScreen({ navigation, route }: any) {
 }
 
 const styles = StyleSheet.create({
-  backgroundImage: { flex: 1, backgroundColor: colors.screenBg },
+  bg: { flex: 1, backgroundColor: colors.screenBg },
   safeArea: { flex: 1 },
   container: { flex: 1 },
 

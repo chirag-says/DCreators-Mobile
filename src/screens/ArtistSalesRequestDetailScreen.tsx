@@ -18,8 +18,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Bell, Truck, CreditCard, BadgeCheck } from 'lucide-react-native';
-import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
+import { updateArtworkOrderStatus } from '../services/artworkService';
 import { colors, fonts, fontSizes } from '../styles/theme';
 
 const NAVY   = '#1B3A5C';
@@ -50,11 +50,7 @@ export default function ArtistSalesRequestDetailScreen({ navigation, route }: Pr
     if (!agreed) { Alert.alert('Terms Required', 'Please agree to the Terms and Conditions first.'); return; }
     setSubmitting(true);
     try {
-      const { error } = await supabase
-        .from('artwork_orders')
-        .update({ status: 'accepted', updated_at: new Date().toISOString() })
-        .eq('id', order.id);
-      if (error) throw error;
+      await updateArtworkOrderStatus(order.id, 'accepted');
       Alert.alert('Accepted ✅', 'The buyer has been notified. Awaiting advance payment.', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
@@ -69,11 +65,7 @@ export default function ArtistSalesRequestDetailScreen({ navigation, route }: Pr
         text: 'Decline', style: 'destructive', onPress: async () => {
           setSubmitting(true);
           try {
-            const { error } = await supabase
-              .from('artwork_orders')
-              .update({ status: 'declined', updated_at: new Date().toISOString() })
-              .eq('id', order.id);
-            if (error) throw error;
+            await updateArtworkOrderStatus(order.id, 'declined');
             Alert.alert('Declined', 'Request declined.', [
               { text: 'OK', onPress: () => navigation.goBack() },
             ]);

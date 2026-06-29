@@ -17,8 +17,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, ChevronDown, Calendar, CreditCard, Star, BadgeCheck } from 'lucide-react-native';
-import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
+import { createProject } from '../services/projectService';
 import { colors, fonts, fontSizes, spacing } from '../styles/theme';
 import type { ConsultantProfile } from '../types';
 
@@ -80,25 +80,17 @@ export default function HireConsultantScreen({ navigation, route }: Props) {
     setSubmitting(true);
     try {
       // Create the project record
-      const { data: project, error } = await supabase
-        .from('projects')
-        .insert({
-          client_id:         profile.id,
-          consultant_id:     consultant?.user_id ?? null,
-          assignment_type:   role,
-          assignment_brief:  brief.trim(),
-          assignment_details:[item],
-          budget:            budgetNum,
-          final_offer:       finalCost,
-          deadline:          date ? new Date(date).toISOString() : null,
-          status:            'draft',
-          created_at:        new Date().toISOString(),
-          updated_at:        new Date().toISOString(),
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
+      const project = await createProject({
+        client_id:         profile.id,
+        consultant_id:     consultant?.user_id ?? null,
+        assignment_type:   role,
+        assignment_brief:  brief.trim(),
+        assignment_details:[item],
+        budget:            budgetNum,
+        final_offer:       finalCost,
+        deadline:          date ? new Date(date).toISOString() : null,
+        status:            'draft',
+      });
 
       // Navigate to payment screen for 60% advance
       navigation.navigate('Payment', {
