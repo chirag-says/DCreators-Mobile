@@ -137,7 +137,7 @@ export default function WelcomeScreen({ navigation }: any) {
           <Text style={[styles.footerText, { fontSize: s(9), lineHeight: s(13) }]}>
             A Joint Venture of{' '}
             <Text style={styles.footerBold}>Ishisoft Pvt.Ltd</Text>,{' '}
-            <Text style={styles.footerBold}>Mr. Shoumik Mazumder</Text> and
+            <Text style={styles.footerBold}>Mr. Shoumik Mazumdar</Text> and
           </Text>
           <Text style={[styles.footerText, { fontSize: s(9), lineHeight: s(13) }]}>
             <Text style={styles.footerBold}>Design &amp; Animation Club</Text>,

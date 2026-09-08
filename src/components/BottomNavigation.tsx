@@ -21,7 +21,7 @@ import {
   View, TouchableOpacity, Text, StyleSheet, Platform, LayoutAnimation, UIManager,
 } from 'react-native';
 import {
-  Home, Search, ShoppingBag, Clock, ClipboardList, FileText, Briefcase, TrendingUp,
+  Home, Search, ShoppingBag, ClipboardList, FileText, Briefcase, TrendingUp,
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -53,11 +53,12 @@ export default function BottomNavigation({ state, navigation: tabNavigation }: a
   const currentRouteName = state ? state.routes[state.index].name : '';
 
   // ── Tab definitions per role ────────────────────────────────
+  // ACTIVITY absorbed HISTORY: both listed the client's own projects and
+  // differed only by status, so they are now segments of MyActivityScreen.
   const clientTabs: TabDef[] = [
     { name: 'Dashboard', label: 'HOME',   Icon: Home },
     { name: 'Search',    label: 'SEARCH', Icon: Search },
     { name: 'MyActivity', label: 'ACTIVITY', Icon: ClipboardList },
-    { name: 'History',   label: 'HISTORY',Icon: Clock },
     { name: 'Shop',      label: 'SHOP',   Icon: ShoppingBag },
   ];
 
@@ -71,7 +72,7 @@ export default function BottomNavigation({ state, navigation: tabNavigation }: a
 
   const tabs = currentRole === 'consultant' ? consultantTabs : clientTabs;
 
-  // Smooth out the tab-count reflow (4 consultant tabs vs 5 client tabs)
+  // Smooth out the tab-count reflow (5 consultant tabs vs 4 client tabs)
   // when the Client ↔ Creator switch is toggled, instead of an instant snap.
   const prevRole = useRef(currentRole);
   useEffect(() => {

@@ -45,15 +45,34 @@ const PRICE_BAND = 0.2; // ±20% of quoted budget, per spec
 export async function createBidRequest(input: {
   client_id: string;
   category: ConsultantCategory;
+  /** Concrete deliverable, e.g. "Logo Design". Becomes the assignment title. */
+  creative_item: string;
   assignment_brief: string;
   event_date: string | null;
   budget: number;
 }): Promise<BidRequest> {
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('bid_requests')
     .insert(input)
     .select()
     .single();
+
+  // Tolerate a database that has not taken 20260826120100 yet. A client should
+  // not be unable to post a bid because a migration is lagging behind a build;
+  // they lose the pre-set title, and getAssignmentTitle() falls back to the
+  // brief, which is strictly better than a dead submit button.
+  if (error && error.message.includes('creative_item')) {
+    console.warn(
+      '[BidService] bid_requests.creative_item is missing — apply migration ' +
+      '20260826120100_add_bid_creative_item. Posting without the title for now.',
+    );
+    const { creative_item: _omitted, ...withoutItem } = input;
+    ({ data, error } = await supabase
+      .from('bid_requests')
+      .insert(withoutItem)
+      .select()
+      .single());
+  }
 
   if (error) {
     console.error('[BidService] createBidRequest error:', error.message);
@@ -188,6 +207,22 @@ export async function fetchConsultantBidInbox(consultantProfileId: string): Prom
   return (data ?? []) as BidCandidateWithRequest[];
 }
 
+/** Live state of a single bid candidate — for the negotiation chat handshake. */
+export async function fetchBidCandidateById(id: string): Promise<Pick<
+  BidCandidate, 'id' | 'quoted_price' | 'offer_by' | 'status'
+> | null> {
+  const { data, error } = await supabase
+    .from('bid_candidates')
+    .select('id, quoted_price, offer_by, status')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) {
+    console.error('[BidService] fetchBidCandidateById error:', error.message);
+    return null;
+  }
+  return data as any;
+}
+
 // ─── Sequential dispatch / decisions ──────────────────────────
 
 async function fetchCandidate(bidCandidateId: string): Promise<BidCandidate> {
@@ -225,6 +260,10 @@ export async function acceptBidCandidate(bidCandidateId: string): Promise<Projec
     .single();
   if (cpErr || !consultantProfile) throw new Error(cpErr?.message || 'Consultant not found');
 
+  // The price was already agreed during the bid handshake (one side proposed
+  // `quoted_price`, the other is accepting it here), so the project is born
+  // past negotiation, at advance_pending — no redundant "Accept Project" on
+  // the consultant's Project Dashboard.
   const categoryLabel = bidRequest.category.charAt(0).toUpperCase() + bidRequest.category.slice(1);
   const { data: project, error: projErr } = await supabase
     .from('projects')
@@ -232,14 +271,19 @@ export async function acceptBidCandidate(bidCandidateId: string): Promise<Projec
       client_id: bidRequest.client_id,
       consultant_id: consultantProfile.user_id,
       assignment_type: `Hire ${categoryLabel}`,
-      assignment_details: null,
+      // Carry the client's creative item through as the assignment title.
+      // Older bid rows predate the column and stay null; getAssignmentTitle()
+      // degrades to the brief for those.
+      assignment_details: bidRequest.creative_item ? [bidRequest.creative_item] : null,
       assignment_brief: bidRequest.assignment_brief,
       budget: candidate.quoted_price,
       event_date: bidRequest.event_date,
-      status: 'assigned',
+      status: 'advance_pending',
       progress_percent: 0,
       work_order_data: null,
-      final_offer: null,
+      final_offer: candidate.quoted_price,
+      offer_by: candidate.offer_by,
+      price_agreed: true,
     })
     .select()
     .single();
@@ -253,12 +297,25 @@ export async function acceptBidCandidate(bidCandidateId: string): Promise<Projec
     .in('status', ['queued', 'pending', 'negotiating']);
   await supabase.from('bid_requests').update({ status: 'fulfilled', updated_at: new Date().toISOString() }).eq('id', candidate.bid_request_id);
 
-  sendNotification({
-    userId: bidRequest.client_id,
-    title: 'Bid Accepted!',
-    message: `Your booking request was accepted for ₹${candidate.quoted_price.toLocaleString('en-IN')}.`,
-    type: 'assignment',
-  });
+  // Notify whoever did NOT just accept (the other side of the handshake).
+  const priceLabel = `₹${Number(candidate.quoted_price).toLocaleString('en-IN')}`;
+  if (candidate.offer_by === 'consultant') {
+    // Client accepted the consultant's counter-offer.
+    sendNotification({
+      userId: consultantProfile.user_id,
+      title: 'Offer Accepted!',
+      message: `The client accepted your ${priceLabel} offer. They'll pay the advance to begin.`,
+      type: 'assignment',
+    });
+  } else {
+    // Consultant accepted the client's price.
+    sendNotification({
+      userId: bidRequest.client_id,
+      title: 'Bid Accepted!',
+      message: `Your consultant accepted at ${priceLabel}. Pay the advance to start the project.`,
+      type: 'assignment',
+    });
+  }
 
   return project as Project;
 }
@@ -337,10 +394,35 @@ export async function proposeNegotiation(bidCandidateId: string): Promise<void> 
   if (error) throw new Error(error.message);
 }
 
-export async function updateQuotedPrice(bidCandidateId: string, price: number): Promise<void> {
+/**
+ * Counter the price on a bid candidate (either side). Replaces the current
+ * quoted price, records who proposed it, and keeps the candidate in
+ * 'negotiating' so the other party sees an Accept/Counter prompt.
+ */
+export async function counterBidPrice(
+  bidCandidateId: string,
+  price: number,
+  by: 'client' | 'consultant',
+): Promise<void> {
+  if (!(price > 0)) throw new Error('Enter a valid amount.');
   const { error } = await supabase
     .from('bid_candidates')
-    .update({ quoted_price: price, updated_at: new Date().toISOString() })
+    .update({ quoted_price: price, offer_by: by, status: 'negotiating', updated_at: new Date().toISOString() })
     .eq('id', bidCandidateId);
   if (error) throw new Error(error.message);
+
+  // Notify the other party that a new number is on the table.
+  const { data: cand } = await supabase
+    .from('bid_candidates')
+    .select('bid_request_id, consultant_id, bid_requests(client_id), consultant_profiles(user_id)')
+    .eq('id', bidCandidateId)
+    .single();
+  const priceLabel = `₹${price.toLocaleString('en-IN')}`;
+  if (by === 'consultant') {
+    const clientId = (cand as any)?.bid_requests?.client_id;
+    if (clientId) sendNotification({ userId: clientId, title: 'New Counter-Offer', message: `Your consultant countered at ${priceLabel}. Accept or counter back.`, type: 'assignment' });
+  } else {
+    const consultantUserId = (cand as any)?.consultant_profiles?.user_id;
+    if (consultantUserId) sendNotification({ userId: consultantUserId, title: 'New Counter-Offer', message: `The client countered at ${priceLabel}. Accept or counter back.`, type: 'assignment' });
+  }
 }

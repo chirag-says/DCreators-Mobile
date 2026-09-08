@@ -1,27 +1,30 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  Platform, Alert, ActivityIndicator, Animated, Modal,
+  Alert, ActivityIndicator, Animated, Modal,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
+import { useSafeBottomPadding } from '../hooks/useSafeBottomPadding';
 import { WebView } from 'react-native-webview';
 import {
-  ArrowLeft, CheckCircle, CreditCard, Smartphone, Building2,
+  CheckCircle, CreditCard, Smartphone, Building2,
   Shield, Lock, X, AlertCircle,
 } from 'lucide-react-native';
-import TopHeader from '../components/TopHeader';
+import ScreenHeader from '../components/ScreenHeader';
 import { supabase } from '../lib/supabase';
 import { updateProjectStatus } from '../services/projectService';
 import { createCashfreeOrder, verifyPaymentStatus } from '../lib/cashfree';
 import { sendNotification } from '../lib/notifications';
 import { useAuthStore } from '../store/useAuthStore';
 import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
+import { getAssignmentTitle } from '../lib/assignment';
 
 
 export default function PaymentScreen({ navigation, route }: any) {
   const project = route?.params?.project;
   const paymentType = route?.params?.paymentType || 'balance';
   const profile = useAuthStore((s) => s.profile);
+  const bottomPad = useSafeBottomPadding(14);
 
   const [isPaying, setIsPaying] = useState(false);
   const [isPaid, setIsPaid] = useState(false);
@@ -35,9 +38,15 @@ export default function PaymentScreen({ navigation, route }: any) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
 
-  const totalCost = project?.final_offer || project?.budget || 0;
-  const budget = project?.budget ? Number(project.budget) : 0;
-  const advance = Math.round(budget * 0.5);
+  // Cashfree's WebView can fire both the postMessage('success') handler and the
+  // navigation-state handler for the same redirect; guard so verification only runs once.
+  const completionHandledRef = useRef(false);
+
+  // Agreed price is the source of truth (final_offer once negotiated, else the
+  // original budget). Advance is 50% of the AGREED total — not the stale budget,
+  // which would otherwise make advance + balance not sum to the agreed price.
+  const totalCost = Number(project?.final_offer ?? project?.budget ?? 0);
+  const advance = Math.round(totalCost * 0.5);
   const balance = totalCost - advance;
   const payAmount = paymentType === 'advance' ? advance : balance;
 
@@ -55,23 +64,34 @@ export default function PaymentScreen({ navigation, route }: any) {
       Alert.alert('Error', 'User profile not found. Please log in again.');
       return;
     }
+    if (!project?.id) {
+      Alert.alert('Error', 'This payment is not attached to a project.');
+      return;
+    }
 
     // For balance payment: transition final_approved → balance_pending before opening gateway
-    if (paymentType === 'balance' && project?.id) {
+    if (paymentType === 'balance') {
       try { await updateProjectStatus(project.id, 'balance_pending'); }
       catch (err: any) { Alert.alert('Error', err.message); return; }
     }
 
+    completionHandledRef.current = false;
     setIsPaying(true);
     try {
+      // The amount is the server's to decide. `payAmount` below is only what
+      // this screen displays; if the two ever disagree the server wins, and
+      // the user should be told before they are sent to the gateway.
       const order = await createCashfreeOrder({
-        projectId: project?.id,
-        amount: payAmount,
+        projectId: project.id,
         paymentType,
-        customerName: profile.name || 'User',
-        customerEmail: profile.email,
-        customerPhone: profile.phone || undefined,
       });
+
+      if (order.amount !== payAmount) {
+        Alert.alert(
+          'Amount updated',
+          `The agreed price changed. You are being charged ₹${order.amount.toLocaleString('en-IN')}.`,
+        );
+      }
 
       setCurrentOrderId(order.order_id);
       const env = order.environment === 'PROD' ? 'production' : 'sandbox';
@@ -152,6 +172,8 @@ export default function PaymentScreen({ navigation, route }: any) {
   }
 
   async function handlePaymentComplete() {
+    if (completionHandledRef.current) return;
+    completionHandledRef.current = true;
     setVerifying(true);
     try {
       const result = await verifyPaymentStatus(currentOrderId);
@@ -197,20 +219,11 @@ export default function PaymentScreen({ navigation, route }: any) {
   return (
     <View style={styles.bg}>
       <SafeAreaView style={styles.safe} edges={['top']}>
-        <TopHeader />
+        <ScreenHeader title={paymentType === 'advance' ? 'Advance Payment' : 'Balance Payment'} />
 
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
           <View style={styles.container}>
 
-            <View style={styles.titleRow}>
-              <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                <ArrowLeft size={20} color={colors.textPrimary} />
-              </TouchableOpacity>
-              <Text style={styles.pageTitle}>
-                {paymentType === 'advance' ? 'Advance Payment' : 'Balance Payment'}
-              </Text>
-              <View style={{ width: 36 }} />
-            </View>
 
             {isPaid ? (
               <Animated.View style={[styles.successCard, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
@@ -291,7 +304,7 @@ export default function PaymentScreen({ navigation, route }: any) {
                   <View style={styles.costRow}>
                     <Text style={styles.costLabel}>Project</Text>
                     <Text style={[styles.costValue, { maxWidth: '60%' }]} numberOfLines={1}>
-                      {project?.assignment_details?.[0] || project?.assignment_type || 'Creative Service'}
+                      {getAssignmentTitle(project)}
                     </Text>
                   </View>
                   <View style={styles.costRow}>
@@ -355,7 +368,7 @@ export default function PaymentScreen({ navigation, route }: any) {
 
         {/* Pay Button */}
         {!isPaid && !verifying && (
-          <View style={styles.actionBar}>
+          <View style={[styles.actionBar, { paddingBottom: bottomPad }]}>
             <TouchableOpacity
               style={[styles.payBtn, isPaying && { opacity: 0.6 }]}
               onPress={handlePayPress}
@@ -375,7 +388,11 @@ export default function PaymentScreen({ navigation, route }: any) {
 
         {/* ── Cashfree WebView Checkout Modal ── */}
         <Modal visible={showWebView} animationType="slide" onRequestClose={() => setShowWebView(false)}>
-          <SafeAreaView style={{ flex: 1, backgroundColor: '#FFF' }}>
+          {/* Modal is a separate native window — it needs its own SafeAreaProvider
+              so SafeAreaView measures real insets here (otherwise the checkout
+              header slides under the notch / status bar). */}
+          <SafeAreaProvider>
+          <SafeAreaView style={{ flex: 1, backgroundColor: '#FFF' }} edges={['top', 'bottom']}>
             <View style={styles.webViewHeader}>
               <TouchableOpacity
                 onPress={() => {
@@ -410,6 +427,7 @@ export default function PaymentScreen({ navigation, route }: any) {
               )}
             />
           </SafeAreaView>
+          </SafeAreaProvider>
         </Modal>
 
       </SafeAreaView>
@@ -422,9 +440,6 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   container: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm },
 
-  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.xl },
-  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.7)', alignItems: 'center', justifyContent: 'center' },
-  pageTitle: { fontSize: fontSizes.xl, fontFamily: fonts.heavy, color: colors.textPrimary },
 
   card: {
     backgroundColor: 'rgba(255,255,255,0.85)', borderWidth: 1, borderColor: '#E6E6E6',
@@ -483,7 +498,6 @@ const styles = StyleSheet.create({
 
   actionBar: {
     paddingHorizontal: spacing.xl, paddingVertical: 14,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 14,
     backgroundColor: colors.cardBg, borderTopWidth: 1, borderTopColor: colors.borderCard,
   },
   payBtn: {

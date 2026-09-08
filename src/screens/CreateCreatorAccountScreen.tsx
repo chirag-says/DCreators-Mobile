@@ -12,7 +12,8 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, Image, Alert, ActivityIndicator, Modal,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import KeyboardAvoider from '../components/KeyboardAvoider';
 import { ArrowLeft, Bell, Camera, ChevronDown, FileText, Upload, X } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -21,6 +22,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { upsertConsultantProfile } from '../services/consultantService';
 import { uploadToCloudinary, uploadRawToCloudinary } from '../lib/cloudinary';
 import { colors, fonts, fontSizes } from '../styles/theme';
+import { EXPERIENCE_OPTIONS } from '../config/profileOptions';
 
 const NAVY = '#1B3A5C';
 const TEAL = '#3D9B8F';
@@ -57,6 +59,7 @@ const INDIAN_BANKS = [
 const BANK_OPTIONS = [...INDIAN_BANKS].sort((a, b) => a.localeCompare(b)).concat(OTHER_BANK);
 
 export default function CreateCreatorAccountScreen({ navigation }: any) {
+  const insets = useSafeAreaInsets();
   const profile = useAuthStore(s => s.profile);
   const fetchConsultantProfile = useAuthStore(s => s.fetchConsultantProfile);
   const updateProfile = useAuthStore(s => s.updateProfile);
@@ -66,6 +69,7 @@ export default function CreateCreatorAccountScreen({ navigation }: any) {
   const [showPreview, setShowPreview] = useState(false);
 
   const [experience, setExperience] = useState('');
+  const [showExperienceDropdown, setShowExperienceDropdown] = useState(false);
   const [institutionName, setInstitutionName] = useState('');
   const [aadhar, setAadhar] = useState('');
   const [pan, setPan] = useState('');
@@ -81,11 +85,6 @@ export default function CreateCreatorAccountScreen({ navigation }: any) {
   const [submitting, setSubmitting] = useState(false);
 
   async function pickAvatar() {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert('Permission needed', 'Please allow photo library access.');
-      return;
-    }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
@@ -183,7 +182,12 @@ export default function CreateCreatorAccountScreen({ navigation }: any) {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoider>
+      <ScrollView
+        contentContainerStyle={[s.scroll, { paddingBottom: 40 + insets.bottom }]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={s.heroTitle}>Create{'\n'}Creator's{'\n'}Account</Text>
         <Text style={s.heroSub}>
           Step 1 of 4 — register your identity and banking details so clients can pay you securely.
@@ -210,14 +214,33 @@ export default function CreateCreatorAccountScreen({ navigation }: any) {
           </Text>
         </View>
 
+        {/* Picked from a fixed list, not typed: the value is shown verbatim on
+            the public profile, so it has to carry its own unit consistently. */}
         <Text style={s.fieldLabel}>PROFESSIONAL EXPERIENCE</Text>
-        <TextInput
-          style={s.input}
-          placeholder="e.g. 5 years"
-          placeholderTextColor={colors.textTertiary}
-          value={experience}
-          onChangeText={setExperience}
-        />
+        <TouchableOpacity
+          style={s.dropdownTrigger}
+          onPress={() => setShowExperienceDropdown(v => !v)}
+          activeOpacity={0.85}
+        >
+          <Text style={[s.dropdownValue, !experience && s.dropdownPlaceholder]} numberOfLines={1}>
+            {experience || 'Select your experience'}
+          </Text>
+          <ChevronDown size={18} color={colors.textSecondary} style={{ transform: [{ rotate: showExperienceDropdown ? '180deg' : '0deg' }] }} />
+        </TouchableOpacity>
+        {showExperienceDropdown && (
+          <View style={s.dropdownList}>
+            {EXPERIENCE_OPTIONS.map(opt => (
+              <TouchableOpacity
+                key={opt}
+                style={[s.dropdownItem, opt === experience && s.dropdownItemActive]}
+                onPress={() => { setExperience(opt); setShowExperienceDropdown(false); }}
+                activeOpacity={0.8}
+              >
+                <Text style={[s.dropdownItemText, opt === experience && s.dropdownItemTextActive]}>{opt}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         <Text style={s.fieldLabel}>INSTITUTION / ORGANIZATION</Text>
         <TextInput
@@ -336,6 +359,7 @@ export default function CreateCreatorAccountScreen({ navigation }: any) {
           {submitting ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.registerBtnText}>Register</Text>}
         </TouchableOpacity>
       </ScrollView>
+      </KeyboardAvoider>
 
       {/* Avatar crop preview modal */}
       <Modal visible={showPreview} transparent animationType="fade" onRequestClose={() => setShowPreview(false)}>

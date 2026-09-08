@@ -18,31 +18,53 @@ serve(async (req) => {
 
   try {
     const body = await req.text();
-    const payload = JSON.parse(body);
 
-    // Verify webhook signature from Cashfree
+    // ── Verify the signature BEFORE parsing or trusting anything ───────────
+    // This check used to compute the HMAC, log a mismatch, and carry on. That
+    // meant anyone who could POST here could mark any order paid, because the
+    // order id is the only thing needed to find the row. Nothing below runs
+    // now unless Cashfree actually signed the request.
     const timestamp = req.headers.get('x-webhook-timestamp') || '';
     const signature = req.headers.get('x-webhook-signature') || '';
 
-    // Cashfree signature verification
-    const signaturePayload = timestamp + body;
+    if (!timestamp || !signature) {
+      console.error('Webhook rejected: missing signature headers');
+      return new Response('Missing signature', { status: 401 });
+    }
+
+    // Reject anything older than five minutes so a captured payload cannot be
+    // replayed later. Cashfree sends the timestamp in seconds.
+    const sentAtMs = Number(timestamp) * 1000;
+    if (!Number.isFinite(sentAtMs) || Math.abs(Date.now() - sentAtMs) > 5 * 60 * 1000) {
+      console.error('Webhook rejected: stale or unparseable timestamp');
+      return new Response('Stale timestamp', { status: 401 });
+    }
+
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
       'raw',
       encoder.encode(CASHFREE_SECRET_KEY),
       { name: 'HMAC', hash: 'SHA-256' },
       false,
-      ['sign']
+      ['sign'],
     );
-    const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(signaturePayload));
+    const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(timestamp + body));
     const computedSignature = btoa(String.fromCharCode(...new Uint8Array(sig)));
 
-    if (signature !== computedSignature) {
-      console.error('Webhook signature mismatch');
-      // In production, reject unsigned webhooks. For testing, we continue.
-      // return new Response('Invalid signature', { status: 401 });
+    // Length-independent compare, so a wrong signature cannot be narrowed down
+    // by timing how long the rejection takes.
+    const a = encoder.encode(signature);
+    const b = encoder.encode(computedSignature);
+    let diff = a.length ^ b.length;
+    for (let i = 0; i < Math.max(a.length, b.length); i++) {
+      diff |= (a[i] ?? 0) ^ (b[i] ?? 0);
+    }
+    if (diff !== 0) {
+      console.error('Webhook rejected: signature mismatch');
+      return new Response('Invalid signature', { status: 401 });
     }
 
+    const payload = JSON.parse(body);
     const eventType = payload.type; // PAYMENT_SUCCESS_WEBHOOK, PAYMENT_FAILED_WEBHOOK, etc.
     const orderData = payload.data?.order;
     const paymentData = payload.data?.payment;
@@ -68,6 +90,16 @@ serve(async (req) => {
       if (fetchErr || !payment) {
         console.error('Payment not found for order:', orderId);
         return new Response('Payment not found', { status: 404 });
+      }
+
+      // Cashfree retries until it gets a 2xx, so the same success event can
+      // arrive several times. Without this the consultant gets a duplicate
+      // "payment received" notification on every retry.
+      if (payment.status === 'completed') {
+        return new Response(JSON.stringify({ received: true, duplicate: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
       }
 
       // Update payment status

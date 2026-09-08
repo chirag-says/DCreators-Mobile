@@ -13,7 +13,8 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, ActivityIndicator, Alert, Switch,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import KeyboardAvoider from '../components/KeyboardAvoider';
 import { ArrowLeft, Send, Bell } from 'lucide-react-native';
 import { useAuthStore } from '../store/useAuthStore';
 import { updateConsultantProfile } from '../services/consultantService';
@@ -26,6 +27,7 @@ const BG = '#EDF1F5';
 
 export default function ConsultantCategoryDetailsScreen({ navigation, route }: any) {
   const fromOnboarding = route?.params?.fromOnboarding === true;
+  const insets = useSafeAreaInsets();
   const consultantProfile = useAuthStore(s => s.consultantProfile);
   const fetchConsultantProfile = useAuthStore(s => s.fetchConsultantProfile);
 
@@ -166,7 +168,12 @@ export default function ConsultantCategoryDetailsScreen({ navigation, route }: a
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoider>
+      <ScrollView
+        contentContainerStyle={[s.scroll, { paddingBottom: 40 + insets.bottom }]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={s.heroTitle}>Tell Clients{'\n'}What You{'\n'}Offer</Text>
         {fromOnboarding ? (
           <Text style={s.stepHint}>
@@ -207,6 +214,7 @@ export default function ConsultantCategoryDetailsScreen({ navigation, route }: a
           }
         </TouchableOpacity>
       </ScrollView>
+      </KeyboardAvoider>
     </SafeAreaView>
   );
 }

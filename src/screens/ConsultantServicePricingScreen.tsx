@@ -13,11 +13,14 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, ActivityIndicator, Alert, Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import KeyboardAvoider from '../components/KeyboardAvoider';
 import { ArrowLeft, ShieldCheck, ChevronDown, Send, Save, Edit3, Bell } from 'lucide-react-native';
 import { useAuthStore } from '../store/useAuthStore';
 import { fetchConsultantServicePricing, upsertConsultantServicePricing, updateConsultantProfile } from '../services/consultantService';
 import { colors, fonts, fontSizes, spacing, radii } from '../styles/theme';
+import { creativeItemsFor } from '../lib/assignment';
+import { PRICE_UNITS, PRICE_UNIT_LABELS, toPriceUnit, type PriceUnit } from '../lib/booking';
 
 const NAVY = '#1B3A5C';
 const TEAL = '#3D9B8F';
@@ -27,64 +30,10 @@ const BG = '#EDF1F5';
 type Category = 'Designer' | 'Photographer' | 'Videographer' | 'Sculptor' | 'Artisan';
 const CATEGORIES: Category[] = ['Designer', 'Photographer', 'Videographer', 'Sculptor', 'Artisan'];
 
-const SERVICE_ITEMS: Record<Category, string[]> = {
-  Designer: [
-    'Academic event photography',
-    'Accessories & Jewelleries (terracotta)',
-    'App design',
-    'Architectural Photography',
-    'Birthday photography',
-    'Brand identity design',
-    'Brochure design',
-    'Logo design',
-    'Poster design',
-    'Social media design',
-    'UI/UX design',
-    'Website design',
-  ],
-  Photographer: [
-    'Academic event photography',
-    'Architectural Photography',
-    'Birthday photography',
-    'Corporate photography',
-    'Fashion photography',
-    'Food photography',
-    'Product photography',
-    'Wedding photography',
-    'Wildlife photography',
-  ],
-  Videographer: [
-    'Corporate video',
-    'Drone coverage',
-    'Event coverage',
-    'Music video',
-    'Same-day edit',
-    'Social media reel',
-    'Wedding film',
-  ],
-  Sculptor: [
-    'Abstract sculpture',
-    'Bronze casting',
-    'Clay modelling',
-    'Installation art',
-    'Metal sculpture',
-    'Stone carving',
-    'Terracotta work',
-    'Wood carving',
-  ],
-  Artisan: [
-    'Accessories & Jewelleries (terracotta)',
-    'Ceramic work',
-    'Fabric printing',
-    'Hand embroidery',
-    'Leather craft',
-    'Macramé',
-    'Paper craft',
-    'Pottery',
-    'Weaving',
-    'Wooden craft',
-  ],
-};
+// The catalogue moved to lib/assignment so the client-facing bid, book, hire
+// and assign screens offer exactly what consultants can price here. Editing an
+// item's wording orphans the consultant_service_pricing rows keyed to the old
+// string, so change it in one place or not at all.
 
 const CATEGORY_DB_VALUE: Record<Category, string> = {
   Designer: 'designer',
@@ -106,17 +55,21 @@ const CATEGORY_HEADLINE: Record<Category, string> = {
 
 export default function ConsultantServicePricingScreen({ navigation, route }: any) {
   const fromOnboarding = route?.params?.fromOnboarding === true;
+  const insets = useSafeAreaInsets();
   const consultantProfile = useAuthStore(s => s.consultantProfile);
   const fetchConsultantProfile = useAuthStore(s => s.fetchConsultantProfile);
 
   const [category,   setCategory]   = useState<Category>('Designer');
   const [showCatDD,  setShowCatDD]  = useState(false);
   const [prices,     setPrices]     = useState<Record<string, string>>({});
+  // One unit for every fee below, not one per service: a consultant who
+  // charges by the day charges by the day for all of it.
+  const [priceUnit,  setPriceUnit]  = useState<PriceUnit>('per_project');
   const [loading,    setLoading]    = useState(true);
   const [saving,     setSaving]     = useState(false);
   const [mode,       setMode]       = useState<'view' | 'edit'>('edit');
 
-  const services = SERVICE_ITEMS[category];
+  const services = creativeItemsFor(CATEGORY_DB_VALUE[category]);
 
   // Resume with the consultant's already-chosen category, if any.
   useEffect(() => {
@@ -125,6 +78,10 @@ export default function ConsultantServicePricingScreen({ navigation, route }: an
       if (match) setCategory(match);
     }
   }, [consultantProfile?.category]);
+
+  useEffect(() => {
+    setPriceUnit(toPriceUnit(consultantProfile?.price_unit));
+  }, [consultantProfile?.price_unit]);
 
   useEffect(() => { fetchPricing(); }, [category]);
 
@@ -164,6 +121,7 @@ export default function ConsultantServicePricingScreen({ navigation, route }: an
       const subtitle = `${category} Consultant`;
       await updateConsultantProfile(consultantProfile.id, {
         category: CATEGORY_DB_VALUE[category], base_price: basePrice, expertise, subtitle,
+        price_unit: priceUnit,
       });
       await fetchConsultantProfile();
 
@@ -196,7 +154,12 @@ export default function ConsultantServicePricingScreen({ navigation, route }: an
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoider>
+      <ScrollView
+        contentContainerStyle={[s.scroll, { paddingBottom: 40 + insets.bottom }]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={s.heroTitle}>{fromOnboarding ? 'Set Up\nConsultancy\nServices' : 'Update\nConsultancy\nServices'}</Text>
         {fromOnboarding ? (
           <Text style={s.stepHint}>Step 2 of 4 — choose your category and set your fees.</Text>
@@ -241,6 +204,29 @@ export default function ConsultantServicePricingScreen({ navigation, route }: an
             </View>
           )}
         </View>
+
+        {/* Rate basis. Without this a client saw "₹ 4,900" on the profile with
+            no way to tell a day rate from a whole-project fee. */}
+        <Text style={[s.sectionLabel, { marginTop: 20 }]}>MY FEES ARE QUOTED</Text>
+        <View style={s.unitRow}>
+          {PRICE_UNITS.map(unit => {
+            const active = priceUnit === unit;
+            return (
+              <TouchableOpacity
+                key={unit}
+                style={[s.unitChip, active && s.unitChipActive, !isEditable && s.unitChipLocked]}
+                onPress={() => setPriceUnit(unit)}
+                disabled={!isEditable}
+                activeOpacity={0.8}
+              >
+                <Text style={[s.unitChipText, active && s.unitChipTextActive]}>
+                  {PRICE_UNIT_LABELS[unit]}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        <Text style={s.unitHint}>Shown to clients next to every price on your profile.</Text>
 
         {/* Service fee list */}
         <Text style={[s.sectionLabel, { marginTop: 20 }]}>CONSULTANCY FEES # CREATIVE ITEMS</Text>
@@ -312,6 +298,7 @@ export default function ConsultantServicePricingScreen({ navigation, route }: an
         </View>
 
       </ScrollView>
+      </KeyboardAvoider>
     </SafeAreaView>
   );
 }
@@ -337,6 +324,14 @@ const s = StyleSheet.create({
   dropdownItemActive: { backgroundColor: '#F0F2FF' },
   dropdownItemText: { fontSize: fontSizes.base, fontFamily: fonts.body, color: colors.textPrimary },
   dropdownItemTextActive: { fontWeight: '700', color: NAVY, fontFamily: fonts.heavy },
+  // Rate basis
+  unitRow: { flexDirection: 'row', gap: 8 },
+  unitChip: { flex: 1, alignItems: 'center', paddingVertical: 11, borderRadius: radii.full, backgroundColor: '#fff', borderWidth: 1.5, borderColor: colors.borderInput },
+  unitChipActive: { backgroundColor: NAVY, borderColor: NAVY },
+  unitChipLocked: { opacity: 0.55 },
+  unitChipText: { fontSize: fontSizes.sm + 1, fontFamily: fonts.medium, color: colors.textSecondary },
+  unitChipTextActive: { color: '#fff', fontWeight: '700', fontFamily: fonts.heavy },
+  unitHint: { fontSize: fontSizes.xs + 1, fontFamily: fonts.body, color: colors.textTertiary, marginTop: 8 },
   // Fee table
   feeTable: { backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#E5E7EB', marginBottom: 20, overflow: 'hidden' },
   feeRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, gap: 8 },

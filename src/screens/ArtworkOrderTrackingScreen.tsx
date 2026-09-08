@@ -10,6 +10,7 @@ import {
   Image, ActivityIndicator, Alert, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeBottomPadding } from '../hooks/useSafeBottomPadding';
 import { ArrowLeft, Package, Truck, CheckCircle2, Clock, CreditCard, Star } from 'lucide-react-native';
 import { fetchArtworkOrderById, updateArtworkOrderStatus } from '../services/artworkService';
 import { sendNotification } from '../lib/notifications';
@@ -35,6 +36,7 @@ function stepIndex(s: ArtworkOrderStatus) { return STATUS_ORDER.indexOf(s); }
 
 export default function ArtworkOrderTrackingScreen({ navigation, route }: any) {
   const { orderId } = route?.params ?? {};
+  const bottomPad = useSafeBottomPadding(20);
   const [order, setOrder] = useState<ArtworkOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState(false);
@@ -168,7 +170,7 @@ export default function ArtworkOrderTrackingScreen({ navigation, route }: any) {
       </ScrollView>
 
       {/* Bottom CTA */}
-      <View style={s.actionBar}>
+      <View style={[s.actionBar, { paddingBottom: bottomPad }]}>
         {isDispatched && !isDelivered && (
           <TouchableOpacity
             style={[s.primaryBtn, confirming && { opacity: 0.6 }]}
@@ -257,7 +259,7 @@ const s = StyleSheet.create({
   addrCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: colors.borderCard },
   addrLabel: { fontSize: 10, fontWeight: '700', fontFamily: fonts.heavy, color: colors.textTertiary, letterSpacing: 0.6, marginBottom: 6 },
   addrText: { fontSize: fontSizes.sm + 1, fontFamily: fonts.body, color: colors.textPrimary, lineHeight: 22 },
-  actionBar: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: colors.borderCard, padding: 20, paddingBottom: Platform.OS === 'ios' ? 36 : 20 },
+  actionBar: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: colors.borderCard, padding: 20 },
   primaryBtn: { backgroundColor: NAVY, borderRadius: 14, paddingVertical: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   payBtn: { backgroundColor: TEAL, borderRadius: 14, paddingVertical: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   rateBtn: { backgroundColor: ORANGE, borderRadius: 14, paddingVertical: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },

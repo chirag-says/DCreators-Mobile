@@ -13,10 +13,12 @@ import {
   TextInput, ActivityIndicator, Alert, Platform, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import KeyboardAvoider from '../components/KeyboardAvoider';
 import { ArrowLeft, Zap, MessageSquare, Gem, Star } from 'lucide-react-native';
 import FigmaBottomBar from '../components/FigmaBottomBar';
 import { updateProjectStatus, createReview } from '../services/projectService';
 import { sendNotification } from '../lib/notifications';
+import { useAuthStore } from '../store/useAuthStore';
 import { colors, fonts, fontSizes, spacing, radii } from '../styles/theme';
 
 const NAVY   = '#1B3A5C';
@@ -33,6 +35,7 @@ const QUICK_CHIPS = [
 
 export default function RateConsultantScreen({ navigation, route }: any) {
   const { project } = route?.params ?? {};
+  const profile = useAuthStore((s) => s.profile);
 
   const consultantName   = project?.consultant_profiles?.display_name ?? 'the Consultant';
   const consultantAvatar = project?.consultant_profiles?.profile_picture_url ?? null;
@@ -50,19 +53,19 @@ export default function RateConsultantScreen({ navigation, route }: any) {
   async function handleSubmit() {
     if (rating === 0) { Alert.alert('Rating Required', 'Please select a star rating.'); return; }
     if (!project?.id)  { Alert.alert('Error', 'Project not found.'); return; }
+    if (!profile?.id)  { Alert.alert('Error', 'Missing user info.'); return; }
 
     setSaving(true);
     try {
+      const selectedTags = Object.keys(chips).filter((k) => chips[k]);
       // Insert review record
       await createReview({
-        project_id:          project.id,
-        client_id:           project.client_id,
-        consultant_id:       project.consultant_id,
+        project_id:    project.id,
+        reviewer_id:   profile.id,
+        consultant_id: project.consultant_id || null,
         rating,
-        feedback_text:       feedback.trim() || null,
-        fast_delivery:       !!chips['fast_delivery'],
-        great_comms:         !!chips['great_comms'],
-        exceeded_expectation: !!chips['exceeded_expectation'],
+        review_text:   feedback.trim() || null,
+        tags:          selectedTags.length > 0 ? selectedTags : null,
       });
 
       // delivered → completed via the status machine
@@ -119,7 +122,8 @@ export default function RateConsultantScreen({ navigation, route }: any) {
         <Text style={styles.topTagline}>HIRE CREATIVES. BUY ART. BUILD IDEAS</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoider>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
         {/* Page title */}
         <Text style={styles.pageTitle}>RATE YOUR{'\n'}EXPERIENCE</Text>
@@ -205,6 +209,7 @@ export default function RateConsultantScreen({ navigation, route }: any) {
         </View>
 
       </ScrollView>
+      </KeyboardAvoider>
 
       <FigmaBottomBar navigation={navigation} activeTab="profile" />
     </SafeAreaView>

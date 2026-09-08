@@ -134,6 +134,7 @@ export default function SearchScreen({ navigation }: any) {
       expertise: consultant.expertise,
       category: consultant.category,
       base_price: consultant.base_price,
+      price_unit: consultant.price_unit,
       avatar_url: consultant.avatar_url,
       portfolio_images: consultant.portfolio_images,
     }});
@@ -143,7 +144,7 @@ export default function SearchScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: '#FFF' }]} edges={['top']}>
-      <View style={styles.bg}>
+      <View style={styles.backgroundImage}>
         {/* Search Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>

@@ -36,6 +36,8 @@ import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
 import EditProfileScreen from './src/screens/EditProfileScreen';
 import ChatScreen from './src/screens/ChatScreen';
 import CreatorWorkorderScreen from './src/screens/CreatorWorkorderScreen';
+import AssignmentAcceptedScreen from './src/screens/AssignmentAcceptedScreen';
+import AssignmentPaymentScreen from './src/screens/AssignmentPaymentScreen';
 import InvoiceScreen from './src/screens/InvoiceScreen';
 import SavedCreatorsScreen from './src/screens/SavedCreatorsScreen';
 import RatingReviewScreen from './src/screens/RatingReviewScreen';
@@ -65,7 +67,6 @@ import ConsultantProjectManagementScreen from './src/screens/ConsultantProjectMa
 import ConsultantCategoryDetailsScreen from './src/screens/ConsultantCategoryDetailsScreen';
 
 // Phase 6 — Remaining Figma Screens
-import HireConsultantScreen from './src/screens/HireConsultantScreen';
 import ConsultantPortfolioUpdateScreen from './src/screens/ConsultantPortfolioUpdateScreen';
 import PaymentConfirmedScreen from './src/screens/PaymentConfirmedScreen';
 import ArtistSalesRequestDetailScreen from './src/screens/ArtistSalesRequestDetailScreen';
@@ -91,8 +92,9 @@ function MainTabs() {
       <Tab.Screen name="Dashboard" component={DashboardScreen} />
       <Tab.Screen name="Search" component={SearchScreen} />
       <Tab.Screen name="History" component={HistoryScreen} />
-      <Tab.Screen name="CreatorProfile" component={CreatorProfileScreen} />
-      <Tab.Screen name="AssignProject" component={AssignProjectScreen} />
+      {/* CreatorProfile and AssignProject moved to the stack below — they are
+          detail screens, not tabs, and a tab navigator has no history for
+          their back buttons to pop. */}
       <Tab.Screen name="FloatingQuery" component={FloatingQueryScreen} />
       <Tab.Screen name="CreatorWorkorder" component={CreatorWorkorderScreen} />
       <Tab.Screen name="MyActivity" component={MyActivityScreen} />
@@ -139,6 +141,11 @@ export default function App() {
           <Stack.Screen name="Main" component={MainTabs} />
 
           {/* Sub-screens (Bottom Nav hidden automatically when pushed) */}
+          {/* Pushed detail screens: reached with a plain navigate() from tab
+              screens, which bubbles up to this stack, so back/swipe/hardware
+              back all pop correctly. */}
+          <Stack.Screen name="CreatorProfile" component={CreatorProfileScreen} />
+          <Stack.Screen name="AssignProject" component={AssignProjectScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
           <Stack.Screen name="EditProfile" component={EditProfileScreen} />
           <Stack.Screen name="EditConsultantProfile" component={EditConsultantProfileScreen} />
@@ -153,6 +160,9 @@ export default function App() {
           <Stack.Screen name="GenerateWorkOrder" component={GenerateWorkOrderScreen} />
           <Stack.Screen name="ConsultantWorkOrder" component={ConsultantWorkOrderScreen} />
           <Stack.Screen name="RateConsultant" component={RateConsultantScreen} />
+          {/* Consultant post-acceptance: confirmation, then per-project money view */}
+          <Stack.Screen name="AssignmentAccepted" component={AssignmentAcceptedScreen} />
+          <Stack.Screen name="AssignmentPayment" component={AssignmentPaymentScreen} />
 
           {/* Phase 4 — Product B: Artwork Marketplace */}
           <Stack.Screen name="ArtistSalesRequest" component={ArtistSalesRequestScreen} />
@@ -166,7 +176,6 @@ export default function App() {
           <Stack.Screen name="ConsultantCategoryDetails" component={ConsultantCategoryDetailsScreen} />
 
           {/* Phase 6 — Remaining Figma Screens */}
-          <Stack.Screen name="HireConsultant" component={HireConsultantScreen} />
           <Stack.Screen name="BookConsultant" component={BookConsultantScreen} />
 
           {/* Phase 7 — Bidding with priority list + negotiation chat */}

@@ -1,26 +1,57 @@
 ﻿import React from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Switch, Platform } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Platform, Alert, Linking, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { User, Bell, Shield, HelpCircle, LogOut, ChevronRight, ChevronLeft } from 'lucide-react-native';
-import TopHeader from '../components/TopHeader';
+import { User, Shield, FileText, LogOut, Trash2, ChevronRight, ChevronLeft, Repeat2 } from 'lucide-react-native';
 import { useAuthStore } from '../store/useAuthStore';
+import { useRoleSwitch } from '../hooks/useRoleSwitch';
+import { LegalUrls } from '../lib/legal';
 import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
 
 
 export default function SettingsScreen({ navigation }: any) {
-  const [notifications, setNotifications] = React.useState(true);
-  const { profile, signOut, currentRole } = useAuthStore();
+  const [isDeleting, setIsDeleting] = React.useState(false);
+  const { profile, signOut, deleteAccount, currentRole } = useAuthStore();
   const displayName = profile?.name || 'User';
   const displayEmail = profile?.email || 'user@example.com';
+  const { canSwitch, toggle: toggleRole } = useRoleSwitch(navigation);
 
   async function handleLogout() {
     await signOut();
     navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
   }
 
+  // Two taps and a typed-out consequence, because this one is final. Play
+  // requires the path to exist in the app; the same thing is reachable from
+  // dcreators.in/delete-account for people who have already uninstalled.
+  function handleDeleteAccount() {
+    Alert.alert(
+      'Delete account?',
+      'Your profile, portfolio, and messages will be erased and you will not be able to sign in again. ' +
+        'Payment records are kept as long as tax law requires, with your name removed.',
+      [
+        { text: 'Keep my account', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setIsDeleting(true);
+            const result = await deleteAccount();
+            setIsDeleting(false);
+
+            if (result.success) {
+              navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+              return;
+            }
+            Alert.alert('Account not deleted', result.error ?? 'Please try again.');
+          },
+        },
+      ],
+    );
+  }
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.cardBg }]} edges={['top']}>
-      <View style={styles.bg}>
+      <View style={styles.backgroundImage}>
       
         
         <View style={styles.header}>
@@ -51,11 +82,41 @@ export default function SettingsScreen({ navigation }: any) {
               </TouchableOpacity>
             </View>
 
-            {/* Settings Options */}
+            {/* IntroScreen tells people "You can switch roles later in
+                settings" at signup. Until now that promise led nowhere —
+                the only switch was a pill in the header. */}
+            {canSwitch && (
+              <View style={styles.settingsGroup}>
+                <Text style={styles.groupTitle}>Role</Text>
+                <TouchableOpacity style={styles.settingRow} onPress={toggleRole} activeOpacity={0.7}>
+                  <View style={styles.settingIconBg}>
+                    <Repeat2 size={20} color={colors.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.settingText}>
+                      Switch to {currentRole === 'consultant' ? 'Client' : 'Creator'}
+                    </Text>
+                    <Text style={styles.settingSubText}>
+                      Currently browsing as {currentRole === 'consultant' ? 'a Creator' : 'a Client'}
+                    </Text>
+                  </View>
+                  <ChevronRight size={20} color={colors.textTertiary} />
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Every row here goes somewhere. The old Personal Information,
+                Privacy & Security and Help Center rows had no onPress at all,
+                and the Push Notifications switch toggled a piece of local
+                state with no push infrastructure behind it. */}
             <View style={styles.settingsGroup}>
               <Text style={styles.groupTitle}>Account</Text>
-              
-              <TouchableOpacity style={styles.settingRow}>
+
+              <TouchableOpacity
+                style={styles.settingRow}
+                onPress={() => navigation.navigate(currentRole === 'consultant' ? 'EditConsultantProfile' : 'EditProfile')}
+                activeOpacity={0.7}
+              >
                 <View style={styles.settingIconBg}>
                   <User size={20} color={colors.primary} />
                 </View>
@@ -63,35 +124,27 @@ export default function SettingsScreen({ navigation }: any) {
                 <ChevronRight size={20} color={colors.textTertiary} />
               </TouchableOpacity>
 
-              <View style={styles.settingRow}>
-                <View style={styles.settingIconBg}>
-                  <Bell size={20} color={colors.primary} />
-                </View>
-                <Text style={styles.settingText}>Push Notifications</Text>
-                <Switch 
-                  value={notifications} 
-                  onValueChange={setNotifications} 
-                  trackColor={{ false: colors.borderInput, true: colors.primary }}
-                />
-              </View>
-              
-              <TouchableOpacity style={styles.settingRow}>
+              <TouchableOpacity
+                style={styles.settingRow}
+                onPress={() => Linking.openURL(LegalUrls.privacy)}
+                activeOpacity={0.7}
+              >
                 <View style={styles.settingIconBg}>
                   <Shield size={20} color={colors.primary} />
                 </View>
-                <Text style={styles.settingText}>Privacy & Security</Text>
+                <Text style={styles.settingText}>Privacy Policy</Text>
                 <ChevronRight size={20} color={colors.textTertiary} />
               </TouchableOpacity>
-            </View>
 
-            <View style={styles.settingsGroup}>
-              <Text style={styles.groupTitle}>Support</Text>
-              
-              <TouchableOpacity style={styles.settingRow}>
+              <TouchableOpacity
+                style={styles.settingRow}
+                onPress={() => Linking.openURL(LegalUrls.terms)}
+                activeOpacity={0.7}
+              >
                 <View style={styles.settingIconBg}>
-                  <HelpCircle size={20} color={colors.primary} />
+                  <FileText size={20} color={colors.primary} />
                 </View>
-                <Text style={styles.settingText}>Help Center & FAQ</Text>
+                <Text style={styles.settingText}>Terms of Service</Text>
                 <ChevronRight size={20} color={colors.textTertiary} />
               </TouchableOpacity>
             </View>
@@ -100,6 +153,22 @@ export default function SettingsScreen({ navigation }: any) {
             <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
               <LogOut size={20} color={colors.error} />
               <Text style={styles.logoutText}>Logout</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.deleteBtn}
+              onPress={handleDeleteAccount}
+              disabled={isDeleting}
+              activeOpacity={0.7}
+            >
+              {isDeleting ? (
+                <ActivityIndicator size="small" color={colors.textTertiary} />
+              ) : (
+                <Trash2 size={18} color={colors.textTertiary} />
+              )}
+              <Text style={styles.deleteText}>
+                {isDeleting ? 'Deleting your account…' : 'Delete account'}
+              </Text>
             </TouchableOpacity>
 
           </View>
@@ -220,6 +289,12 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontFamily: fonts.medium,
   },
+  settingSubText: {
+    fontSize: fontSizes.sm,
+    color: colors.textSecondary,
+    fontFamily: fonts.body,
+    marginTop: 2,
+  },
 
   logoutBtn: {
     flexDirection: 'row',
@@ -238,5 +313,21 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.error,
     fontFamily: fonts.heavy,
+  },
+
+  // Deliberately quieter than Logout: it sits below the thing people
+  // actually came for, and nobody should reach for it by accident.
+  deleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.lg,
+    marginTop: spacing.sm,
+  },
+  deleteText: {
+    fontSize: fontSizes.sm,
+    fontFamily: fonts.medium,
+    color: colors.textTertiary,
   },
 });

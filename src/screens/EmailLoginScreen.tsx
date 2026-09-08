@@ -20,17 +20,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Mail } from 'lucide-react-native';
 import { useAuthStore } from '../store/useAuthStore';
-import { supabase } from '../lib/supabase';
 import { colors, fonts, fontSizes, spacing, radii } from '../styles/theme';
 import { RemoteAssets } from '../lib/assets';
-
-// ─── DEV BYPASS CONFIG ──────────────────────────────────────
-// Set to true to enable fast login for test accounts.
-// REMOVE BEFORE PRODUCTION BUILD.
-const DEV_BYPASS_ENABLED = true;
-const DEV_TEST_EMAIL = 'test@gmail.com';
-const DEV_TEST_PASSWORD = 'test123456';
-// ─────────────────────────────────────────────────────────────
 
 const { width } = Dimensions.get('window');
 
@@ -43,49 +34,6 @@ export default function EmailLoginScreen({ navigation }: any) {
   async function handleSubmit() {
     if (!canSubmit) return;
     const trimmedEmail = email.trim().toLowerCase();
-
-    // ── DEV BYPASS: Skip OTP for test account ───────────
-    if (DEV_BYPASS_ENABLED && trimmedEmail === DEV_TEST_EMAIL) {
-      try {
-        useAuthStore.setState({ isLoading: true });
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: DEV_TEST_EMAIL,
-          password: DEV_TEST_PASSWORD,
-        });
-        if (error) {
-          // If password login fails, try creating the account first
-          const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
-            email: DEV_TEST_EMAIL,
-            password: DEV_TEST_PASSWORD,
-          });
-          if (signUpErr) {
-            Alert.alert('Dev Bypass Failed', signUpErr.message);
-            useAuthStore.setState({ isLoading: false });
-            return;
-          }
-          if (signUpData.user) {
-            useAuthStore.setState({
-              user: { id: signUpData.user.id, email: signUpData.user.email ?? '' },
-            });
-          }
-        } else if (data.user) {
-          useAuthStore.setState({
-            user: { id: data.user.id, email: data.user.email ?? '' },
-          });
-        }
-        // Fetch profiles and go straight to Intro
-        await useAuthStore.getState().fetchProfile();
-        await useAuthStore.getState().fetchConsultantProfile();
-        useAuthStore.setState({ isLoading: false });
-        navigation.navigate('Intro', { userName: 'Tester' });
-        return;
-      } catch (err: any) {
-        Alert.alert('Dev Bypass Error', err.message);
-        useAuthStore.setState({ isLoading: false });
-        return;
-      }
-    }
-    // ── END DEV BYPASS ──────────────────────────────────
 
     const result = await signInWithOTP(trimmedEmail);
     if (result.success) {

@@ -12,7 +12,8 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, ActivityIndicator, Alert, RefreshControl, Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import KeyboardAvoider from '../components/KeyboardAvoider';
 import {
   MoreVertical, Edit3, ChevronLeft, ChevronRight,
   Plus, Save,
@@ -40,6 +41,7 @@ function getFirstDayOfMonth(y: number, m: number) {
 }
 
 export default function ConsultantProjectManagementScreen({ navigation }: any) {
+  const insets = useSafeAreaInsets();
   const consultantProfile = useAuthStore(s => s.consultantProfile);
 
   const [ongoing,    setOngoing]    = useState<Project[]>([]);
@@ -126,7 +128,7 @@ export default function ConsultantProjectManagementScreen({ navigation }: any) {
     setFormSaving(true);
     try {
       await createProjectNote({
-        consultant_id: consultantProfile.user_id,
+        consultant_id: consultantProfile.id,
         title: formTitle.trim(),
         client_name: formClient.trim() || null,
         target_date: formDate || null,
@@ -156,9 +158,11 @@ export default function ConsultantProjectManagementScreen({ navigation }: any) {
     <SafeAreaView style={s.safe} edges={['top']}>
       <TopHeader />
 
+      <KeyboardAvoider>
       <ScrollView
-        contentContainerStyle={s.scroll}
+        contentContainerStyle={[s.scroll, { paddingBottom: 40 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={TEAL} />}
       >
         {/* Ongoing Projects */}
@@ -178,7 +182,11 @@ export default function ConsultantProjectManagementScreen({ navigation }: any) {
             <TouchableOpacity
               key={p.id}
               style={s.projectCard}
-              onPress={() => navigation.navigate('ClientWorkorder', { project: p })}
+              // CreatorWorkorder, not ClientWorkorder. This sent the consultant
+              // to the client's view of their own project, which offers Pay
+              // Advance and Pay Balance — asking the person doing the work to
+              // pay themselves. Matches how the home dashboard opens a project.
+              onPress={() => navigation.navigate('Main', { screen: 'CreatorWorkorder', params: { project: p } })}
               activeOpacity={0.9}
             >
               <View style={s.projectTopRow}>
@@ -332,6 +340,7 @@ export default function ConsultantProjectManagementScreen({ navigation }: any) {
         </View>
 
       </ScrollView>
+      </KeyboardAvoider>
     </SafeAreaView>
   );
 }

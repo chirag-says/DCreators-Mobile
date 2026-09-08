@@ -7,6 +7,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps, NavigatorScreenParams } from '@react-navigation/native';
 import type { Project, ConsultantProfile, ShopProduct, BidRequest } from './index';
+import type { PriceUnit } from '../lib/booking';
 
 // ─── Dashboard Creator View Model ────────────────────────────
 export interface CreatorCardViewModel {
@@ -23,6 +24,8 @@ export interface CreatorCardViewModel {
   portfolio_banner_image?: string | null;
   category: string;
   base_price: number | null;
+  /** Optional: the screens that hand-build this view model predate the column. */
+  price_unit?: PriceUnit;
   is_approved: boolean;
   user_id: string;
 }
@@ -61,6 +64,10 @@ export type RootStackParamList = {
   ConsultantWorkOrder: { project: Project };
   // owner_role: CLIENT  previous: PaymentScreen (balance_paid)  next: Main/Dashboard
   RateConsultant: { project: Project };
+  // owner_role: CONSULTANT  previous: CreatorWorkorder (price accepted)  next: AssignmentPayment | Chat | Main/Dashboard
+  AssignmentAccepted: { project: Project; agreedAmount: number };
+  // owner_role: CONSULTANT  previous: AssignmentAccepted | CreatorWorkorder (advance_pending)
+  AssignmentPayment: { project: Project; agreedAmount?: number };
 
   // Phase 4 — Product B: Artwork Marketplace
   // owner_role: ARTIST  previous: notification (purchase_request)
@@ -80,7 +87,6 @@ export type RootStackParamList = {
   ConsultantCategoryDetails: { fromOnboarding?: boolean } | undefined;
 
   // Phase 6 — Remaining Figma Screens
-  HireConsultant: { consultant?: any } | undefined;
   // owner_role: CLIENT  previous: CreatorProfile "Hire Now"  next: Main/CreatorWorkorder (status: assigned)
   BookConsultant: { consultant: CreatorCardViewModel };
   ConsultantPortfolioUpdate: { fromOnboarding?: boolean } | undefined;
@@ -106,11 +112,18 @@ export type RootStackParamList = {
   Invoice: { project: Project };
   SavedCreators: undefined;
   RatingReview: { project: Project };
-  Shop: undefined;
-  ProductDetails: { product: ShopProduct & { consultant_profiles?: { display_name: string; code: string } } };
+  // Scoped to one creator when pushed from their profile's Shop button.
+  Shop: { consultantId?: string; consultantName?: string } | undefined;
+  ProductDetails: { product: ShopProduct & { consultant_profiles?: { user_id: string; display_name: string; code: string } } };
   MessagesList: undefined;
   MyProducts: undefined;
   AddEditProduct: { product?: ShopProduct } | undefined;
+  // Pushed from Dashboard / Search / SavedCreators. On the stack, not the tab
+  // navigator, so their back buttons have somewhere to pop to.
+  CreatorProfile: { creator: CreatorCardViewModel };
+  // owner_role: CLIENT  workflow: BIDDING PATH (no consultant pre-selected)
+  //                     or DIRECT HIRE (consultant pre-loaded via creator param)
+  AssignProject: { consultant?: CreatorCardViewModel } | undefined;
 };
 
 // ─── Main Tab Navigator ──────────────────────────────────────
@@ -118,10 +131,7 @@ export type MainTabParamList = {
   Dashboard: undefined;
   Search: undefined;
   History: undefined;
-  CreatorProfile: { creator: CreatorCardViewModel };
-  // owner_role: CLIENT  workflow: BIDDING PATH (no consultant pre-selected)
-  // owner_role: CLIENT  workflow: DIRECT HIRE (consultant pre-loaded via creator param)
-  AssignProject: { consultant?: CreatorCardViewModel } | undefined;
+  // CreatorProfile and AssignProject live on the root stack — see below.
   FloatingQuery: undefined;
   CreatorWorkorder: { project: Project };
   // owner_role: CLIENT  bottom-nav tab: bidding entry point + active projects/bids

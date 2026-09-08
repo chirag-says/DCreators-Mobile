@@ -34,6 +34,8 @@ import { updateProjectStatus } from '../services/projectService';
 import { sendNotification } from '../lib/notifications';
 import { colors, fonts, fontSizes, spacing, radii } from '../styles/theme';
 import { RemoteAssets } from '../lib/assets';
+import { getAssignmentTitle } from '../lib/assignment';
+import { formatSchedule } from '../lib/booking';
 import FigmaBottomBar from '../components/FigmaBottomBar';
 
 const NAVY = '#1B3A5C';
@@ -81,6 +83,10 @@ export default function ConsultantWorkOrderScreen({ navigation, route }: any) {
   const advancePaid = wo.advance_paid ?? Math.round(Number(totalFee) * 0.5);
   const balanceDue = wo.balance_due ?? (Number(totalFee) - Number(advancePaid));
 
+  // Null on bidding-path projects and anything created before the schedule
+  // columns existed, in which case the card falls back to the deadline alone.
+  const bookedSlot = formatSchedule(project);
+
   const deadline = (() => {
     const raw = wo.deadline ?? project?.deadline;
     if (!raw) return '15 September 2026';
@@ -89,7 +95,7 @@ export default function ConsultantWorkOrderScreen({ navigation, route }: any) {
 
   const clientName = project?.client_name ?? 'Client';
   const designerName = project?.consultant_profiles?.display_name ?? 'Designer';
-  const projectTitle = project?.assignment_details?.[0] ?? project?.assignment_type ?? 'Creative Project';
+  const projectTitle = getAssignmentTitle(project);
   const overview = project?.assignment_brief ??
     'The objective is to develop a comprehensive brand identity system for the startup. The visual language must modernize the brand while maintaining long-term credibility.';
 
@@ -224,6 +230,15 @@ export default function ConsultantWorkOrderScreen({ navigation, route }: any) {
         <View style={styles.section}>
           <SectionBadge number="08" label="Timeline" icon={<CalendarClock size={16} color={TEAL} />} />
           <View style={styles.timelineCard}>
+            {/* The booked slot, above the delivery deadline: they are different
+                dates and the work order only ever showed the second one. */}
+            {bookedSlot && (
+              <>
+                <Text style={styles.timelineFinalLabel}>BOOKED SLOT</Text>
+                <Text style={styles.timelineFinalDate}>{bookedSlot}</Text>
+                <View style={{ height: 12 }} />
+              </>
+            )}
             <Text style={styles.timelineFinalLabel}>FINAL DEADLINE</Text>
             <Text style={styles.timelineFinalDate}>{deadline}</Text>
             <Text style={styles.timelineMilestone}>Milestone updates every 14 days.</Text>

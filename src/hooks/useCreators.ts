@@ -4,8 +4,9 @@
 // ============================================
 
 import { useState, useEffect, useCallback } from 'react';
-import { fetchActiveConsultants } from '../services/consultantService';
+import { fetchActiveConsultants, fetchConsultantRatings, type ConsultantRating } from '../services/consultantService';
 import type { CreatorCardViewModel } from '../types/navigation';
+import { toPriceUnit } from '../lib/booking';
 import type { ConsultantProfile, ConsultantCategory } from '../types';
 
 /** Fallback avatar mapping when consultant has no avatar_url */
@@ -35,6 +36,7 @@ function toViewModel(cp: ConsultantProfile): CreatorCardViewModel {
     portfolio_banner_image: cp.portfolio_banner_image,
     category: cp.category ?? 'designer',
     base_price: cp.base_price,
+    price_unit: toPriceUnit(cp.price_unit),
     is_approved: cp.is_approved,
     user_id: cp.user_id,
   };
@@ -42,6 +44,8 @@ function toViewModel(cp: ConsultantProfile): CreatorCardViewModel {
 
 export interface UseCreatorsReturn {
   creators: CreatorCardViewModel[];
+  /** Keyed by user_id. Consultants with no reviews are absent, not zero. */
+  ratings: Record<string, ConsultantRating>;
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
@@ -49,6 +53,7 @@ export interface UseCreatorsReturn {
 
 export function useCreators(): UseCreatorsReturn {
   const [creators, setCreators] = useState<CreatorCardViewModel[]>([]);
+  const [ratings, setRatings] = useState<Record<string, ConsultantRating>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,7 +62,13 @@ export function useCreators(): UseCreatorsReturn {
     setError(null);
     try {
       const data = await fetchActiveConsultants();
-      setCreators(data.map(toViewModel));
+      const models = data.map(toViewModel);
+      setCreators(models);
+      // Ordering the dashboard's "Creators in Demand" row needs a demand
+      // signal, and this is the only one a browsing client is allowed to read.
+      // One batched query off the ids just loaded; it swallows its own errors
+      // and returns {}, so a ratings outage costs the ordering, not the row.
+      setRatings(await fetchConsultantRatings(models.map(m => m.user_id)));
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load creators';
       setError(message);
@@ -69,5 +80,5 @@ export function useCreators(): UseCreatorsReturn {
 
   useEffect(() => { fetch(); }, [fetch]);
 
-  return { creators, loading, error, refresh: fetch };
+  return { creators, ratings, loading, error, refresh: fetch };
 }

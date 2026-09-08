@@ -6,9 +6,10 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   User, ShoppingBag, Bell, Bookmark, Settings, FileText,
-  MessageCircle, ChevronRight, LogOut, Package,
+  MessageCircle, ChevronRight, LogOut, Package, Repeat2,
 } from 'lucide-react-native';
 import { useAuthStore } from '../store/useAuthStore';
+import { useRoleSwitch } from '../hooks/useRoleSwitch';
 import { supabase } from '../lib/supabase';
 import { colors, fonts, spacing } from '../styles/theme';
 import { RemoteAssets } from '../lib/assets';
@@ -64,6 +65,7 @@ export default function SideMenu({ visible, onClose, navigation, progress }: Pro
   const displayName = profile?.name || 'User';
   const displayRole = isConsultant ? 'Creative Consultant' : 'Client';
   const consultantCode = consultantProfile?.code || '';
+  const { canSwitch, toggle: toggleRole } = useRoleSwitch(navigation);
 
   // Anchor the panel's grow-from-button animation at the hamburger's actual
   // on-screen position: insets.top + the header's own paddingTop/centering math.
@@ -165,6 +167,35 @@ export default function SideMenu({ visible, onClose, navigation, progress }: Pro
               </View>
               <ChevronRight size={18} color="#C7CCD4" />
             </TouchableOpacity>
+
+            {/* ── Role switch ──
+                Directly under the profile card, which already states which
+                role is active — so the control to change it sits next to the
+                thing it changes. Was a pill in TopHeader until the client
+                review flagged it as not belonging on every screen. */}
+            {canSwitch && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Role</Text>
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => { onClose(); toggleRole(); }}
+                  activeOpacity={0.6}
+                >
+                  <View style={[styles.iconCircle, { backgroundColor: colors.primary + '12' }]}>
+                    <Repeat2 size={18} color={colors.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.menuText}>
+                      Switch to {isConsultant ? 'Client' : 'Creator'}
+                    </Text>
+                    <Text style={styles.menuSubText}>
+                      Currently browsing as {isConsultant ? 'a Creator' : 'a Client'}
+                    </Text>
+                  </View>
+                  <ChevronRight size={16} color="#CCC" />
+                </TouchableOpacity>
+              </View>
+            )}
 
             {/* ── Menu Sections ── */}
             {MENU_SECTIONS.map((section, si) => {
@@ -294,6 +325,11 @@ const styles = StyleSheet.create({
   menuText: {
     flex: 1, fontSize: 16, fontWeight: '400',
     color: colors.textPrimary, fontFamily: fonts.body,
+  },
+  // Only the role row carries a subtitle: switching modes reshuffles the whole
+  // bottom nav, so it should say what state you are in before you tap it.
+  menuSubText: {
+    fontSize: 12, color: '#8A93A3', fontFamily: fonts.body, marginTop: 1,
   },
 
   // Logout

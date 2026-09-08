@@ -22,6 +22,14 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
   review_2: { label: 'Review 2', color: '#EC4899', icon: AlertCircle },
   final_review: { label: 'Final Review', color: colors.error, icon: AlertCircle },
   approved: { label: 'Approved', color: colors.success, icon: CheckCircle },
+  // Terminal statuses. The row is reused by the Completed segment of the
+  // client's Activity tab, and without these a finished project fell through
+  // to the `pending` default and was labelled "Pending" in amber.
+  balance_paid: { label: 'Balance Paid', color: colors.success, icon: CheckCircle },
+  delivered: { label: 'Delivered', color: colors.success, icon: CheckCircle },
+  completed: { label: 'Completed', color: colors.success, icon: CheckCircle },
+  cancelled: { label: 'Cancelled', color: colors.textTertiary, icon: AlertCircle },
+  rejected: { label: 'Rejected', color: colors.error, icon: AlertCircle },
 };
 
 export default function ClientProjectRow({ project, onPress }: ClientProjectRowProps) {

@@ -9,9 +9,10 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, Image, ActivityIndicator, Alert, Platform,
+  TextInput, Image, ActivityIndicator, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeBottomPadding } from '../hooks/useSafeBottomPadding';
 import { ArrowLeft, Package, Truck, CheckCircle2 } from 'lucide-react-native';
 import { fetchArtworkOrderById, updateArtworkOrderStatus } from '../services/artworkService';
 import { sendNotification } from '../lib/notifications';
@@ -24,6 +25,7 @@ const TEAL = '#3D9B8F';
 
 export default function ArtistOrderDispatchScreen({ navigation, route }: any) {
   const { orderId } = route?.params ?? {};
+  const bottomPad = useSafeBottomPadding(20);
   const [order, setOrder] = useState<ArtworkOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [consignNo, setConsignNo] = useState('');
@@ -158,7 +160,7 @@ export default function ArtistOrderDispatchScreen({ navigation, route }: any) {
       </ScrollView>
 
       {!dispatched && (
-        <View style={s.actionBar}>
+        <View style={[s.actionBar, { paddingBottom: bottomPad }]}>
           <TouchableOpacity
             style={[s.dispatchBtn, saving && { opacity: 0.6 }]}
             onPress={handleDispatch}
@@ -184,7 +186,7 @@ const s = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: colors.borderCard },
   backBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.screenBg, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: fontSizes.lg, fontWeight: '800', fontFamily: fonts.heavy, color: NAVY },
-  scroll: { paddingHorizontal: 20, paddingBottom: 100 },
+  scroll: { paddingHorizontal: 20, paddingBottom: 130 },
   statusBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16, marginBottom: 16, borderRadius: 12, padding: 14 },
   statusBannerPending: { backgroundColor: '#FFF7ED', borderWidth: 1, borderColor: '#FDE68A' },
   statusBannerDone: { backgroundColor: '#EEF9F8', borderWidth: 1, borderColor: TEAL },
@@ -213,7 +215,7 @@ const s = StyleSheet.create({
   payTotalLabel: { fontSize: fontSizes.base, fontWeight: '800', fontFamily: fonts.heavy, color: NAVY },
   payTotalAmount: { fontSize: fontSizes.lg, fontWeight: '800', fontFamily: fonts.heavy, color: NAVY },
   escrowNote: { fontSize: fontSizes.xs + 1, fontFamily: fonts.body, color: colors.textTertiary, fontStyle: 'italic', marginTop: 8 },
-  actionBar: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: colors.borderCard, padding: 20, paddingBottom: Platform.OS === 'ios' ? 36 : 20 },
+  actionBar: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: colors.borderCard, padding: 20 },
   dispatchBtn: { backgroundColor: NAVY, borderRadius: 14, paddingVertical: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   dispatchBtnText: { color: '#fff', fontSize: fontSizes.base, fontWeight: '800', fontFamily: fonts.heavy },
 });

@@ -26,6 +26,35 @@ export interface ProjectWithClient extends Project {
   } | null;
 }
 
+/**
+ * Attach each project's consultant_profiles info by batch-fetching on consultant_id
+ * (= auth user_id, per fix_remaining_schema_gaps.sql item 6). Done as a separate
+ * query rather than a PostgREST embed because projects.consultant_id FKs to
+ * profiles(id), not consultant_profiles(id) — there is no direct relationship for
+ * PostgREST to auto-detect.
+ */
+async function attachConsultantProfiles<T extends { consultant_id: string | null }>(
+  projects: T[],
+): Promise<(T & { consultant_profiles: { display_name: string; code: string; avatar_url?: string | null; category?: string } | null })[]> {
+  const userIds = [...new Set(projects.map(p => p.consultant_id).filter((id): id is string => !!id))];
+  if (userIds.length === 0) {
+    return projects.map(p => ({ ...p, consultant_profiles: null }));
+  }
+
+  const { data, error } = await supabase
+    .from('consultant_profiles')
+    .select('user_id, display_name, code, avatar_url, category')
+    .in('user_id', userIds);
+
+  if (error) {
+    console.error('[ProjectService] attachConsultantProfiles error:', error.message);
+    return projects.map(p => ({ ...p, consultant_profiles: null }));
+  }
+
+  const byUserId = new Map((data ?? []).map(c => [c.user_id, c]));
+  return projects.map(p => ({ ...p, consultant_profiles: (p.consultant_id && byUserId.get(p.consultant_id)) || null }));
+}
+
 /** Active statuses for consultant dashboard (CONSULTANT_PROJECT_MANAGEMENT_SCREEN) */
 const CONSULTANT_ACTIVE_STATUSES: ProjectStatus[] = [
   'assigned', 'advance_pending', 'advance_paid',
@@ -74,7 +103,7 @@ export async function fetchConsultantProjects(consultantId: string): Promise<Pro
 export async function fetchClientProjects(clientId: string): Promise<ProjectWithConsultant[]> {
   const { data, error } = await supabase
     .from('projects')
-    .select('*, consultant_profiles(display_name, code, avatar_url, category)')
+    .select('*')
     .eq('client_id', clientId)
     .in('status', CLIENT_ACTIVE_STATUSES)
     .order('created_at', { ascending: false });
@@ -84,13 +113,16 @@ export async function fetchClientProjects(clientId: string): Promise<ProjectWith
     throw new Error(error.message);
   }
 
-  return (data ?? []) as ProjectWithConsultant[];
+  return attachConsultantProfiles((data ?? []) as Project[]) as Promise<ProjectWithConsultant[]>;
 }
 
 /**
  * Fetch completed projects for history view.
  */
-export async function fetchProjectHistory(userId: string, role: 'client' | 'consultant'): Promise<Project[]> {
+export async function fetchProjectHistory(
+  userId: string,
+  role: 'client' | 'consultant',
+): Promise<ProjectWithConsultant[]> {
   const column = role === 'client' ? 'client_id' : 'consultant_id';
   const { data, error } = await supabase
     .from('projects')
@@ -104,7 +136,10 @@ export async function fetchProjectHistory(userId: string, role: 'client' | 'cons
     throw new Error(error.message);
   }
 
-  return (data ?? []) as Project[];
+  // Consultant names attached, same as fetchClientProjects: the Completed
+  // segment of the client's Activity tab renders these through
+  // ClientProjectRow, which shows who did the work.
+  return attachConsultantProfiles((data ?? []) as Project[]) as Promise<ProjectWithConsultant[]>;
 }
 
 /**
@@ -113,7 +148,7 @@ export async function fetchProjectHistory(userId: string, role: 'client' | 'cons
 export async function fetchProjectById(projectId: string): Promise<ProjectWithConsultant | null> {
   const { data, error } = await supabase
     .from('projects')
-    .select('*, consultant_profiles(display_name, code, avatar_url, category)')
+    .select('*')
     .eq('id', projectId)
     .single();
 
@@ -122,7 +157,8 @@ export async function fetchProjectById(projectId: string): Promise<ProjectWithCo
     return null;
   }
 
-  return data as ProjectWithConsultant;
+  const [withConsultant] = await attachConsultantProfiles([data as Project]);
+  return withConsultant as ProjectWithConsultant;
 }
 
 /**
@@ -158,15 +194,15 @@ const MESSAGING_STATUSES: ProjectStatus[] = [
 export async function fetchMessagingProjects(params: {
   role: 'client' | 'consultant';
   clientId?: string;
-  consultantProfileId?: string;
+  consultantUserId?: string;
 }): Promise<any[]> {
   let request = supabase
     .from('projects')
-    .select('id, assignment_type, status, client_id, consultant_id, consultant_profiles(display_name, code, category, avatar_url)')
+    .select('id, assignment_type, status, client_id, consultant_id')
     .in('status', MESSAGING_STATUSES);
 
-  if (params.role === 'consultant' && params.consultantProfileId) {
-    request = request.eq('consultant_id', params.consultantProfileId);
+  if (params.role === 'consultant' && params.consultantUserId) {
+    request = request.eq('consultant_id', params.consultantUserId);
   } else if (params.clientId) {
     request = request.eq('client_id', params.clientId);
   }
@@ -177,6 +213,8 @@ export async function fetchMessagingProjects(params: {
     console.error('[ProjectService] fetchMessagingProjects error:', error.message);
     return [];
   }
+
+  return attachConsultantProfiles((data ?? []) as { consultant_id: string | null }[]);
 
   return data ?? [];
 }
@@ -198,10 +236,19 @@ export async function fetchConsultantDashboardProjects(consultantUserId: string)
   return (data ?? []) as ProjectWithClient[];
 }
 
-/** Statuses shown as "ongoing" on the consultant project-management screen. */
+/**
+ * Statuses shown as "ongoing" on the consultant project-management screen.
+ *
+ * Derived from CONSULTANT_ACTIVE_STATUSES rather than hand-listed. The two
+ * used to be written out separately and had drifted: this list started at
+ * `work_order_accepted`, so a project sitting at `assigned`, `advance_pending`,
+ * `advance_paid` or `work_order_generated` appeared on the consultant's home
+ * dashboard but was invisible in the PROJECTS tab. Anything the home screen
+ * counts as active belongs here too, plus the later states home does not track.
+ */
 const MANAGEMENT_ONGOING_STATUSES: ProjectStatus[] = [
-  'work_order_accepted', 'in_progress', 'review_1', 'review_2',
-  'final_review', 'final_approved', 'balance_pending', 'balance_paid',
+  ...CONSULTANT_ACTIVE_STATUSES,
+  'final_approved', 'balance_pending', 'balance_paid',
 ];
 
 /** Fetch a consultant's ongoing projects for the project-management screen, with client name joined. */
@@ -251,8 +298,9 @@ const STATUS_TRANSITIONS: Partial<Record<ProjectStatus, ProjectStatus[]>> = {
   // CLIENT_ASSIGN_PROJECT_SCREEN → CLIENT_CONSULTANT_MATCHING_SCREEN
   draft: ['assigned', 'cancelled'],
 
-  // CLIENT_CONSULTANT_MATCHING_SCREEN: consultant selected
-  assigned: ['advance_pending', 'cancelled'],
+  // Negotiation state: client & consultant agree a price (advance_pending),
+  // client cancels, or consultant passes on the assignment (rejected).
+  assigned: ['advance_pending', 'cancelled', 'rejected'],
 
   // CLIENT_ADVANCE_PAYMENT_SCREEN: client submits payment
   advance_pending: ['advance_paid', 'cancelled'],
@@ -342,6 +390,58 @@ export async function updateProjectStatus(
   if (error) {
     throw new Error(error.message);
   }
+}
+
+// ─── Price Negotiation Handshake ─────────────────────────────
+// One symmetric mechanism for both direct-hire and (post-create) projects:
+// either party proposes a price; the other accepts (locks + advances to
+// advance payment), counters (replaces the offer, flips offer_by), or
+// declines. `final_offer` always holds the current proposed/agreed price.
+
+/**
+ * Propose / counter a price on a project still in negotiation (`assigned`).
+ * Sets the current offer amount and records who made it; never changes status.
+ */
+export async function proposeProjectPrice(
+  projectId: string,
+  amount: number,
+  by: 'client' | 'consultant',
+): Promise<void> {
+  if (!(amount > 0)) throw new Error('Enter a valid amount.');
+  const { error } = await supabase
+    .from('projects')
+    .update({ final_offer: amount, offer_by: by, price_agreed: false, updated_at: new Date().toISOString() })
+    .eq('id', projectId)
+    .eq('status', 'assigned'); // guard: can't renegotiate once past negotiation
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Accept the price currently on the table. Locks it (`price_agreed = true`)
+ * and moves the project to advance payment. Caller is the party who did NOT
+ * make the pending offer (enforced by the UI showing Accept only to them).
+ */
+export async function acceptProjectPrice(projectId: string): Promise<void> {
+  const { error: lockErr } = await supabase
+    .from('projects')
+    .update({ price_agreed: true, updated_at: new Date().toISOString() })
+    .eq('id', projectId)
+    .eq('status', 'assigned');
+  if (lockErr) throw new Error(lockErr.message);
+
+  // Validated transition assigned -> advance_pending (now legal: price agreed).
+  await updateProjectStatus(projectId, 'advance_pending');
+}
+
+/**
+ * Consultant passes on a direct-hire assignment (no priority list to fall back
+ * to), or client cancels before agreement. Terminal for this project.
+ */
+export async function closeNegotiation(
+  projectId: string,
+  outcome: 'rejected' | 'cancelled',
+): Promise<void> {
+  await updateProjectStatus(projectId, outcome);
 }
 
 // ─── Payment Queries ─────────────────────────────────────────
@@ -550,7 +650,7 @@ export async function createCollaborationRequest(request: {
 export async function fetchCompletedProjectsForEarnings(consultantUserId: string): Promise<any[]> {
   const { data, error } = await supabase
     .from('projects')
-    .select('id, assignment_brief, final_offer, budget, updated_at, client:profiles!client_id(name)')
+    .select('id, assignment_type, assignment_details, assignment_brief, final_offer, budget, updated_at, client:profiles!client_id(name)')
     .eq('consultant_id', consultantUserId)
     .eq('status', 'completed')
     .order('updated_at', { ascending: false });
@@ -594,7 +694,7 @@ export async function fetchConsultantReviews(consultantUserId: string): Promise<
 }>> {
   const { data, error } = await supabase
     .from('reviews')
-    .select('id, rating, review_text, created_at, profiles(name)')
+    .select('id, rating, review_text, created_at, profiles!reviewer_id(name)')
     .eq('consultant_id', consultantUserId)
     .order('created_at', { ascending: false })
     .limit(5);

@@ -10,13 +10,18 @@ import { supabase } from './supabase';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 
+/**
+ * What the client is allowed to decide.
+ *
+ * The amount and the customer details used to be sent from here. They are not
+ * anymore: the Edge Function reads the agreed price off the project and the
+ * name and email off the profile, because a number posted by the client is a
+ * number the client can change. All this says is which project, and which
+ * half of it.
+ */
 export interface CreateOrderParams {
-  projectId?: string;
-  amount: number;
-  paymentType: 'advance' | 'balance' | 'shop_purchase';
-  customerName: string;
-  customerEmail: string;
-  customerPhone?: string;
+  projectId: string;
+  paymentType: 'advance' | 'balance';
 }
 
 export interface CashfreeOrder {
@@ -25,6 +30,8 @@ export interface CashfreeOrder {
   cf_order_id: string;
   order_status: string;
   environment: 'TEST' | 'PROD';
+  /** What the server decided to charge. Authoritative. */
+  amount: number;
 }
 
 /**
@@ -33,21 +40,20 @@ export interface CashfreeOrder {
  */
 export async function createCashfreeOrder(params: CreateOrderParams): Promise<CashfreeOrder> {
   const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    throw new Error('Please sign in to make a payment.');
+  }
 
   const response = await fetch(`${SUPABASE_URL}/functions/v1/create-cashfree-order`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${session?.access_token || ''}`,
+      'Authorization': `Bearer ${session.access_token}`,
       'apikey': process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '',
     },
     body: JSON.stringify({
       project_id: params.projectId,
-      amount: params.amount,
       payment_type: params.paymentType,
-      customer_name: params.customerName,
-      customer_email: params.customerEmail,
-      customer_phone: params.customerPhone,
     }),
   });
 

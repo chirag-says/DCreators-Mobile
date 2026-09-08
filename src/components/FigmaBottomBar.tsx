@@ -9,7 +9,7 @@
 import React from 'react';
 import { View, TouchableOpacity, Text, StyleSheet, Platform } from 'react-native';
 import {
-  ChevronLeft, Home, Search, ShoppingBag, User, Clock,
+  ChevronLeft, Home, Search, ShoppingBag, User, ClipboardList,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../store/useAuthStore';
@@ -24,7 +24,7 @@ type TabKey = 'back' | 'home' | 'search' | 'sales' | 'profile';
 interface FigmaBottomBarProps {
   navigation: any;
   activeTab?: TabKey;
-  /** Override the sales tab (e.g. 'History' for client role) */
+  /** Override the sales tab destination for this screen. */
   saltsTabName?: string;
 }
 
@@ -36,11 +36,13 @@ export default function FigmaBottomBar({
   const insets = useSafeAreaInsets();
   const currentRole = useAuthStore((s) => s.currentRole);
 
-  // Sales tab screen name depends on role
+  // Sales tab screen name depends on role. The client's side points at
+  // MyActivity since HISTORY was folded into it as a Completed segment —
+  // pointing here at a screen no longer in their tab bar would strand them.
   const salesScreen = saltsTabName
-    ?? (currentRole === 'consultant' ? 'CreatorDashboard' : 'History');
-  const salesLabel = currentRole === 'consultant' ? 'SALES' : 'HISTORY';
-  const SalesIcon  = currentRole === 'consultant' ? ShoppingBag : Clock;
+    ?? (currentRole === 'consultant' ? 'CreatorDashboard' : 'MyActivity');
+  const salesLabel = currentRole === 'consultant' ? 'SALES' : 'ACTIVITY';
+  const SalesIcon  = currentRole === 'consultant' ? ShoppingBag : ClipboardList;
 
   // Profile tab
   const profileScreen = currentRole === 'consultant' ? 'EditConsultantProfile' : 'EditProfile';

@@ -30,6 +30,13 @@ interface ClientDashboardProps {
   navigation: MainTabScreenProps<'Dashboard'>['navigation'];
 }
 
+// "Creators in Demand" is ranked by review score, so it needs a rule for what
+// counts as demand. Bayesian average rather than a raw mean: a lone 5.0 from
+// one client should not outrank a 4.6 earned over a dozen jobs.
+const DEMAND_PRIOR_WEIGHT = 3;   // worth this many reviews
+const DEMAND_PRIOR_MEAN = 3.5;
+const IN_DEMAND_LIMIT = 4;
+
 // Section configuration for the creator browsing cards
 const SECTIONS = [
   { title: 'Creators in Demand', category: null as string | null },
@@ -49,21 +56,32 @@ const CATEGORY_TABS = [
 
 export default function ClientDashboard({ navigation }: ClientDashboardProps) {
   const [activeCat, setActiveCat] = React.useState<string | null>(null);
-  const { creators, loading: creatorsLoading, error: creatorsError, refresh: refreshCreators } = useCreators();
+  const { creators, ratings, loading: creatorsLoading, error: creatorsError, refresh: refreshCreators } = useCreators();
 
   const onRefresh = useCallback(async () => {
     await refreshCreators();
   }, [refreshCreators]);
 
+  /** Unreviewed creators score -1: no reviews is no evidence of demand. */
+  function demandScore(c: CreatorCardViewModel): number {
+    const r = ratings[c.user_id];
+    if (!r || r.review_count === 0) return -1;
+    return (r.average_rating * r.review_count + DEMAND_PRIOR_MEAN * DEMAND_PRIOR_WEIGHT)
+      / (r.review_count + DEMAND_PRIOR_WEIGHT);
+  }
+
   function getCreatorsForSection(section: typeof SECTIONS[0]): CreatorCardViewModel[] {
     if (!section.category) {
-      // "Creators in Demand" — first 4 unique categories
-      const seen = new Set<string>();
-      return creators.filter((c) => {
-        if (seen.has(c.category)) return false;
-        seen.add(c.category);
-        return true;
-      }).slice(0, 4);
+      // Was "first creator of each category", which meant the leading
+      // photographer headed this row and headed Photographer's Archive
+      // directly below it — the same person twice on one screen. Ranking by
+      // review score makes the row a genuinely different set, and one whose
+      // title is true.
+      return creators
+        .map((c, joinOrder) => ({ c, joinOrder, score: demandScore(c) }))
+        .sort((a, b) => b.score - a.score || a.joinOrder - b.joinOrder)
+        .slice(0, IN_DEMAND_LIMIT)
+        .map(({ c }) => c);
     }
     return creators.filter((c) => c.category === section.category);
   }
@@ -105,6 +123,46 @@ export default function ClientDashboard({ navigation }: ClientDashboardProps) {
             </View>
             <Text style={styles.exploreSubtitle}>Explore Creative Consultant's Portfolio</Text>
 
+            {/* Entry point to the bidding flow. It existed end to end in the
+                services but was reachable from exactly one button buried on
+                the Activity screen, so nobody found it. */}
+            <TouchableOpacity
+              style={styles.bidCta}
+              onPress={() => navigation.navigate('CreateBid')}
+              activeOpacity={0.88}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.bidCtaTitle}>Have a budget in mind?</Text>
+                <Text style={styles.bidCtaSub}>
+                  Name your price and we'll line up consultants who fit it. Rank them,
+                  and we'll ask your first choice first.
+                </Text>
+              </View>
+              <View style={styles.bidCtaArrow}>
+                <ChevronRight size={18} color="#fff" />
+              </View>
+            </TouchableOpacity>
+
+            {/* The other half of the same decision: name a budget and let
+                consultants come to you, or pick one and brief them directly.
+                AssignProject was previously reachable only through the Terms &
+                Conditions page, which nobody would ever look for it behind. */}
+            <TouchableOpacity
+              style={styles.hireCta}
+              onPress={() => navigation.navigate('AssignProject')}
+              activeOpacity={0.88}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.hireCtaTitle}>Know who you want?</Text>
+                <Text style={styles.hireCtaSub}>
+                  Brief a consultant directly and skip the bidding round.
+                </Text>
+              </View>
+              <View style={styles.hireCtaArrow}>
+                <ChevronRight size={18} color={NAVY} />
+              </View>
+            </TouchableOpacity>
+
             {/* Error Banner */}
             {creatorsError && (
               <View style={styles.errorBanner}>
@@ -136,18 +194,14 @@ export default function ClientDashboard({ navigation }: ClientDashboardProps) {
                     <View key={section.title} style={styles.sectionWrap}>
                       <View style={styles.sectionHeader}>
                         <Text style={styles.headerText}>{section.title}</Text>
-                        <TouchableOpacity style={styles.viewAllBtn} activeOpacity={0.7}>
-                          <Text style={styles.viewAllText}>View All</Text>
-                          <ChevronRight size={14} color={colors.textSecondary} />
-                        </TouchableOpacity>
                       </View>
                       <ScrollView
                         horizontal
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.cardsScrollContent}
                       >
-                        {sectionCreators.map((c, i) => (
-                          <FeaturedCreatorCard key={c.id} creator={c} index={i} onPress={goToProfile} />
+                        {sectionCreators.map((c) => (
+                          <FeaturedCreatorCard key={c.id} creator={c} onPress={goToProfile} />
                         ))}
                       </ScrollView>
                     </View>
@@ -160,7 +214,7 @@ export default function ClientDashboard({ navigation }: ClientDashboardProps) {
               <Text style={styles.footerText}>
                 A Joint Venture of{' '}
                 <Text style={styles.footerBold}>Ishisoft Pvt.Ltd</Text>,{' '}
-                <Text style={styles.footerBold}>Mr. Shoumik Mazumder</Text> and
+                <Text style={styles.footerBold}>Mr. Shoumik Mazumdar</Text> and
               </Text>
               <Text style={styles.footerText}>
                 <Text style={styles.footerBold}>Design &amp; Animation Club</Text>,
@@ -222,12 +276,86 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontFamily: fonts.heavy,
   },
+  // A page title, not a second section header. At fontSizes.base bold navy it
+  // sat one weight-step from the orange section headers below and read as a
+  // peer of them; nothing on the screen said which level you were at.
   exploreSubtitle: {
-    fontSize: fontSizes.base,
-    fontWeight: '700',
+    fontSize: fontSizes['2xl'],
+    fontWeight: '800',
     fontFamily: fonts.heavy,
     color: NAVY,
     textAlign: 'center',
+    lineHeight: 26,
+  },
+
+  // ── Bidding CTA ───────────────────────────────
+  bidCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: NAVY,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+    marginHorizontal: spacing.xl,
+    marginTop: spacing.lg,
+  },
+  bidCtaTitle: {
+    fontSize: fontSizes.base,
+    fontWeight: '800',
+    fontFamily: fonts.heavy,
+    color: '#fff',
+  },
+  bidCtaSub: {
+    fontSize: fontSizes.xs + 1,
+    fontFamily: fonts.body,
+    color: 'rgba(255,255,255,0.82)',
+    lineHeight: 17,
+    marginTop: 4,
+  },
+  bidCtaArrow: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // ── Direct hire CTA ───────────────────────────
+  // Outlined against the bid CTA's navy fill: the two are peers, but bidding
+  // is the path a client without a shortlist takes, so it keeps the emphasis.
+  hireCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.cardBg,
+    borderRadius: radii.lg,
+    borderWidth: 1.5,
+    borderColor: NAVY,
+    padding: spacing.lg,
+    marginHorizontal: spacing.xl,
+    marginTop: -8,
+  },
+  hireCtaTitle: {
+    fontSize: fontSizes.base,
+    fontWeight: '800',
+    fontFamily: fonts.heavy,
+    color: NAVY,
+  },
+  hireCtaSub: {
+    fontSize: fontSizes.xs + 1,
+    fontFamily: fonts.body,
+    color: colors.textSecondary,
+    lineHeight: 17,
+    marginTop: 4,
+  },
+  hireCtaArrow: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(27,58,92,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // ── Error ─────────────────────────────────────
@@ -242,18 +370,11 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   sectionHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    flexDirection: 'row', alignItems: 'center',
   },
   headerText: {
     fontWeight: '700', fontSize: fontSizes.lg, fontFamily: fonts.heavy,
     color: colors.orange,
-  },
-  viewAllBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 2,
-  },
-  viewAllText: {
-    fontSize: fontSizes.xs + 1, fontFamily: fonts.medium, fontWeight: '600',
-    color: colors.textSecondary,
   },
   cardsScrollContent: {
     gap: spacing.md,

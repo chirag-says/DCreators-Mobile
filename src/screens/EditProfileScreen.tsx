@@ -1,13 +1,16 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Platform, Alert, ActivityIndicator, Image } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { User, ChevronLeft } from 'lucide-react-native';
 import { useAuthStore } from '../store/useAuthStore';
 import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
+import KeyboardAvoider from '../components/KeyboardAvoider';
+import { useSafeBottomPadding } from '../hooks/useSafeBottomPadding';
 
 
 export default function EditProfileScreen({ navigation }: any) {
   const { profile, user, updateProfile } = useAuthStore();
+  const bottomPad = useSafeBottomPadding(spacing.lg);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
@@ -38,7 +41,8 @@ export default function EditProfileScreen({ navigation }: any) {
           <Text style={styles.headerTitle}>Edit Profile</Text>
           <View style={{ width: 40 }} />
         </View>
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 8 }}>
+        <KeyboardAvoider>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 8 }} keyboardShouldPersistTaps="handled">
           <View style={styles.container}>
             <View style={styles.avatarSection}>
               <View style={styles.avatarCircle}>
@@ -59,11 +63,12 @@ export default function EditProfileScreen({ navigation }: any) {
             </View>
           </View>
         </ScrollView>
-        <View style={styles.actionsBar}>
+        <View style={[styles.actionsBar, { paddingBottom: bottomPad }]}>
           <TouchableOpacity style={[styles.saveBtn, isSaving && { opacity: 0.6 }]} onPress={handleSave} disabled={isSaving}>
             {isSaving ? <ActivityIndicator color={colors.textOnPrimary} /> : <Text style={styles.saveBtnText}>Save Changes</Text>}
           </TouchableOpacity>
         </View>
+        </KeyboardAvoider>
       </View>
     </SafeAreaView>
   );
@@ -86,7 +91,7 @@ const styles = StyleSheet.create({
   inputDisabled: { backgroundColor: colors.sectionBg, justifyContent: 'center' },
   inputDisabledText: { fontSize: fontSizes.base, fontFamily: fonts.body, color: colors.textTertiary },
   textArea: { height: 100, paddingTop: spacing.md },
-  actionsBar: { padding: spacing.lg, paddingBottom: Platform.OS === 'ios' ? 34 : spacing.lg, backgroundColor: colors.cardBg, borderTopWidth: 1, borderTopColor: colors.border },
+  actionsBar: { padding: spacing.lg, backgroundColor: colors.cardBg, borderTopWidth: 1, borderTopColor: colors.border },
   saveBtn: { backgroundColor: colors.success, paddingVertical: 14, borderRadius: radii.md, alignItems: 'center' },
   saveBtnText: { color: colors.textOnPrimary, fontSize: fontSizes.base, fontWeight: '700', fontFamily: fonts.heavy },
 });

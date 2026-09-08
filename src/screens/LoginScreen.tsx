@@ -7,11 +7,14 @@
  * 2. White card:
  *    - "Welcome Back!" heading
  *    - "Sign in to continue your creative journey"
- *    - Google button (outline)
- *    - Facebook button (blue filled)
  *    - Email button (outline) → navigates to EmailLoginScreen
  *    - OR divider
  *    - "New to Dcreators? Create an account" link
+ *
+ * The Google and Facebook buttons that used to sit above Email are gone.
+ * Neither provider was ever configured, so both only raised a "Coming soon"
+ * alert — a dead control on the first screen a Play reviewer opens. They can
+ * come back the day the OAuth providers are actually wired in Supabase.
  */
 import React from 'react';
 import {
@@ -22,24 +25,16 @@ import {
   ScrollView,
   Image,
   Dimensions,
-  Alert,
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AntDesign, FontAwesome } from '@expo/vector-icons';
 import { Mail } from 'lucide-react-native';
 import { colors, fonts, fontSizes, spacing, radii } from '../styles/theme';
 import { RemoteAssets } from '../lib/assets';
 
 const { width } = Dimensions.get('window');
 
-const FACEBOOK_BLUE = '#1877F2';
-
 export default function LoginScreen({ navigation }: any) {
-  function handleSocialPress(provider: string) {
-    Alert.alert(`${provider} Sign In`, 'Coming soon! Use email to sign in for now.');
-  }
-
   return (
     <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
       <ScrollView
@@ -64,30 +59,6 @@ export default function LoginScreen({ navigation }: any) {
           <Text style={styles.cardSubtitle}>Sign in to continue your creative journey</Text>
 
           <View style={styles.btnStack}>
-            {/* Google */}
-            <TouchableOpacity
-              style={styles.socialOutline}
-              onPress={() => handleSocialPress('Google')}
-              activeOpacity={0.8}
-            >
-              <View style={styles.iconContainer}>
-                <AntDesign name="google" size={20} color="#4285F4" />
-              </View>
-              <Text style={styles.btnTextDark}>Continue with Google</Text>
-            </TouchableOpacity>
-
-            {/* Facebook */}
-            <TouchableOpacity
-              style={styles.socialFacebook}
-              onPress={() => handleSocialPress('Facebook')}
-              activeOpacity={0.8}
-            >
-              <View style={styles.iconContainer}>
-                <FontAwesome name="facebook" size={20} color="#fff" />
-              </View>
-              <Text style={styles.btnTextLight}>Continue with Facebook</Text>
-            </TouchableOpacity>
-
             {/* Email → existing OTP flow */}
             <TouchableOpacity
               style={styles.socialOutline}
@@ -203,14 +174,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     backgroundColor: '#fff',
   },
-  socialFacebook: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: FACEBOOK_BLUE,
-    borderRadius: radii.md,
-    paddingVertical: 14,
-    paddingHorizontal: spacing.lg,
-  },
   iconContainer: {
     width: 32,
     alignItems: 'center',
@@ -223,15 +186,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.medium,
     color: colors.textPrimary,
     marginRight: 32, // balance the icon width for centering
-  },
-  btnTextLight: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: fontSizes.base,
-    fontWeight: '500',
-    fontFamily: fonts.medium,
-    color: '#fff',
-    marginRight: 32,
   },
 
   // ── OR ───────────────────────────────────────

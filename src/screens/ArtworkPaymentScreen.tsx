@@ -13,6 +13,7 @@ import {
   TextInput, Image, ActivityIndicator, Alert, Platform, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import KeyboardAvoider from '../components/KeyboardAvoider';
 import {
   ArrowLeft, CreditCard, Smartphone, ShieldCheck, Lock,
 } from 'lucide-react-native';
@@ -132,7 +133,8 @@ export default function ArtworkPaymentScreen({ navigation, route }: any) {
         <View style={{ width: 34 }} />
       </View>
 
-      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoider>
+      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
         <Text style={s.subtitle}>
           Review your order details and select a secure payment method to finalize the acquisition.
@@ -282,6 +284,7 @@ export default function ArtworkPaymentScreen({ navigation, route }: any) {
         </View>
 
       </ScrollView>
+      </KeyboardAvoider>
     </SafeAreaView>
   );
 }

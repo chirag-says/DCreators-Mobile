@@ -12,7 +12,7 @@
  *
  * Figma: CLIENT_ASSIGN_PROJECT_SCREEN.png
  */
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -27,11 +27,15 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronDown, Calendar, DollarSign, ArrowLeft } from 'lucide-react-native';
+import { ChevronDown, Calendar, DollarSign, BadgeCheck, Lock } from 'lucide-react-native';
+import ScreenHeader from '../components/ScreenHeader';
 import { useAuthStore } from '../store/useAuthStore';
 import { createProject } from '../services/projectService';
+import { fetchActiveConsultants, fetchConsultantRatings, type ConsultantRating } from '../services/consultantService';
+import RatingStars from '../components/RatingStars';
 import { colors, fonts, fontSizes, spacing, radii } from '../styles/theme';
-import { RemoteAssets } from '../lib/assets';
+import { HIRE_ROLES, creativeItemsFor, categoryForRole } from '../lib/assignment';
+import type { ConsultantProfile } from '../types';
 
 // ─── Figma design tokens ──────────────────────────────────────
 const NAVY = '#1B3A5C';
@@ -41,32 +45,8 @@ const ORANGE_LIGHT = '#FFF5ED';
 const BG = '#F5F6FA';
 
 // ─── Creative Items per Figma CONSULTANT_SERVICE_PRICING_SCREEN ─
-const HIRE_ROLES = [
-  'Hire Creative Consultant',
-  'Hire Photographer',
-  'Hire Videographer',
-  'Hire Designer',
-  'Hire Sculptor',
-  'Hire Artisan',
-];
-
-const CREATIVE_ITEMS = [
-  'Academic Event Photography',
-  'Accessories & Jewelleries',
-  'App Design',
-  'Architectural Photography',
-  'Birthday Photography',
-  'Brand Identity',
-  'Logo Design',
-  'Social Media Kit',
-  'Packaging Design',
-  'Illustration',
-  'UI/UX Design',
-  'Product Photography',
-  'Corporate Photography',
-  'Art Direction',
-  'Video Production',
-];
+// Moved to src/lib/assignment.ts so the bid and booking flows ask for the same
+// vocabulary instead of each inventing its own.
 
 export default function AssignProjectScreen({ navigation, route }: any) {
   // Direct hire path passes a consultant; bidding path does not
@@ -78,8 +58,14 @@ export default function AssignProjectScreen({ navigation, route }: any) {
   const [agreedTerms, setAgreedTerms] = useState(false);
 
   // Form state — pre-populate budget from consultant base price on direct hire
-  const [hireRole, setHireRole] = useState(HIRE_ROLES[0]);
-  const [creativeItem, setCreativeItem] = useState(CREATIVE_ITEMS[6]); // default: Logo Design
+  const [hireRole, setHireRole] = useState<string>(HIRE_ROLES[0]);
+  // Creative items are per-discipline, so the list follows the hire role and
+  // the selection resets with it. Defaults to the first item of the starting
+  // role rather than a hardcoded index into a flat list.
+  const itemsForRole = useMemo(() => creativeItemsFor(categoryForRole(hireRole)), [hireRole]);
+  const [creativeItem, setCreativeItem] = useState<string>(
+    () => creativeItemsFor(categoryForRole(HIRE_ROLES[0]))[0] ?? '',
+  );
   const [deadline, setDeadline] = useState('');
   const [budget, setBudget] = useState(
     consultant?.base_price ? String(consultant.base_price) : '',
@@ -89,6 +75,69 @@ export default function AssignProjectScreen({ navigation, route }: any) {
   // Dropdown open states
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
   const [showItemDropdown, setShowItemDropdown] = useState(false);
+  const [showConsultantDropdown, setShowConsultantDropdown] = useState(false);
+
+  // ── Consultant picker ──────────────────────────────────────────
+  // Entering from a creator's profile pre-selects and locks the picker; there
+  // is nothing to choose, the client already chose. Entering cold, the picker
+  // is how a direct hire is aimed at someone.
+  const [roster, setRoster] = useState<ConsultantProfile[]>([]);
+  const [ratings, setRatings] = useState<Record<string, ConsultantRating>>({});
+  const [pickedId, setPickedId] = useState<string | null>(null);
+  const lockedToConsultant = !!consultant;
+
+  useEffect(() => {
+    let cancelled = false;
+    // Locked to one consultant: skip the roster query entirely, fetch only the
+    // one score the card needs.
+    if (lockedToConsultant) {
+      if (!consultant?.user_id) return;
+      fetchConsultantRatings([consultant.user_id]).then(map => {
+        if (!cancelled) setRatings(map);
+      });
+      return () => { cancelled = true; };
+    }
+    fetchActiveConsultants().then(async rows => {
+      if (cancelled) return;
+      const approved = rows.filter(r => r.is_approved);
+      setRoster(approved);
+      const map = await fetchConsultantRatings(approved.map(r => r.user_id));
+      if (!cancelled) setRatings(map);
+    });
+    return () => { cancelled = true; };
+  }, [lockedToConsultant, consultant?.user_id]);
+
+  // Filtered client-side: the roster is small and already in memory, and a
+  // per-role query would refetch on every dropdown change.
+  const rosterForRole = useMemo(
+    () => roster.filter(r => r.category === categoryForRole(hireRole)),
+    [roster, hireRole],
+  );
+
+  const pickedConsultant = useMemo(
+    () => rosterForRole.find(r => r.id === pickedId) ?? null,
+    [rosterForRole, pickedId],
+  );
+
+  // The consultant this assignment is actually aimed at, whichever way we got
+  // here. Everything below reads this rather than branching on entry path.
+  const targetConsultant = consultant
+    ? {
+        user_id: consultant.user_id,
+        display_name: consultant.name ?? 'Consultant',
+        code: consultant.code ?? '',
+        avatar_url: consultant.avatar_url ?? null,
+        is_approved: consultant.is_approved ?? false,
+      }
+    : pickedConsultant
+    ? {
+        user_id: pickedConsultant.user_id,
+        display_name: pickedConsultant.display_name,
+        code: pickedConsultant.code,
+        avatar_url: pickedConsultant.avatar_url,
+        is_approved: pickedConsultant.is_approved,
+      }
+    : null;
 
   const budgetNum = parseFloat(budget) || 0;
 
@@ -128,9 +177,13 @@ export default function AssignProjectScreen({ navigation, route }: any) {
     if (deadline.trim()) {
       payload.deadline = deadline.trim();
     }
-    // Direct hire: attach consultant immediately → status = 'assigned'
-    if (consultant?.user_id) {
-      payload.consultant_id = consultant.user_id;
+    // Direct hire: attach consultant immediately → status = 'assigned'.
+    // The client's budget is the OPENING offer in the price handshake.
+    if (targetConsultant?.user_id) {
+      payload.consultant_id = targetConsultant.user_id;
+      payload.final_offer = budgetNum;
+      payload.offer_by = 'client';
+      payload.price_agreed = false;
     }
     return payload;
   }
@@ -150,14 +203,17 @@ export default function AssignProjectScreen({ navigation, route }: any) {
     try {
       // Bidding path: consultant_id is null, status = 'draft' → matching screen picks consultant
       // Direct hire: consultant_id set, status = 'assigned' → skip matching
-      const status = consultant ? 'assigned' : 'draft';
+      const status = targetConsultant ? 'assigned' : 'draft';
       const payload = buildProjectPayload(status);
 
       const data = await createProject(payload);
 
-      if (consultant) {
-        // DIRECT HIRE: go to the unified Project Dashboard with assigned status
-        navigation.navigate('Main', { screen: 'CreatorWorkorder', params: { project: data } });
+      if (targetConsultant) {
+        // DIRECT HIRE: the CLIENT goes to their own project view to await the
+        // consultant's response (accept / counter). The consultant gets it on
+        // their dashboard. (Was wrongly sending the client to the consultant's
+        // CreatorWorkorder "Accept Project" screen.)
+        navigation.navigate('ClientWorkorder', { project: data });
       } else {
         // BIDDING PATH: go to CLIENT_CONSULTANT_MATCHING_SCREEN
         navigation.navigate('ConsultantMatching', { project: data });
@@ -197,7 +253,7 @@ export default function AssignProjectScreen({ navigation, route }: any) {
 
   function handleReset() {
     setHireRole(HIRE_ROLES[0]);
-    setCreativeItem(CREATIVE_ITEMS[6]);
+    setCreativeItem(creativeItemsFor(categoryForRole(HIRE_ROLES[0]))[0] ?? '');
     setDeadline('');
     setBudget('');
     setBrief('');
@@ -206,6 +262,7 @@ export default function AssignProjectScreen({ navigation, route }: any) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      <ScreenHeader title="Hire & Assign" />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -216,23 +273,6 @@ export default function AssignProjectScreen({ navigation, route }: any) {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* ── Header ───────────────────────────── */}
-          <View style={styles.headerRow}>
-            <TouchableOpacity
-              onPress={() => navigation.goBack()}
-              style={styles.backBtn}
-              activeOpacity={0.7}
-            >
-              <ArrowLeft size={20} color={NAVY} />
-            </TouchableOpacity>
-            <Image
-              source={{ uri: RemoteAssets.dIcon }}
-              style={styles.dIcon}
-              resizeMode="contain"
-            />
-            <Text style={styles.headerTagline}>HIRE CREATIVES. BUY ART. BUILD IDEAS</Text>
-          </View>
-
           {/* ── Title ────────────────────────────── */}
           <Text style={styles.title}>Hire & Assign{'\n'}Project</Text>
           <Text style={styles.subtitle}>
@@ -285,7 +325,14 @@ export default function AssignProjectScreen({ navigation, route }: any) {
                     <TouchableOpacity
                       key={r}
                       style={styles.dropdownItem}
-                      onPress={() => { setHireRole(r); setShowRoleDropdown(false); }}
+                      onPress={() => {
+                        setHireRole(r);
+                        // Snap the deliverable to the new discipline's catalogue.
+                        setCreativeItem(creativeItemsFor(categoryForRole(r))[0] ?? '');
+                        // A photographer is not a candidate for a design job.
+                        setPickedId(null);
+                        setShowRoleDropdown(false);
+                      }}
                     >
                       <Text style={[
                         styles.dropdownItemText,
@@ -296,6 +343,75 @@ export default function AssignProjectScreen({ navigation, route }: any) {
                     </TouchableOpacity>
                   ))}
                 </View>
+              )}
+            </View>
+
+            {/* SELECT CONSULTANT — the direct-hire half of this screen. Without
+                it, arriving here from anywhere but a creator's profile could
+                only ever produce a bid, never a hire. */}
+            <View>
+              <Text style={styles.fieldLabel}>SELECT CONSULTANT</Text>
+              {lockedToConsultant ? (
+                <View style={[styles.dropdown, styles.dropdownLocked]}>
+                  <Text style={styles.dropdownValue}>{targetConsultant?.display_name}</Text>
+                  <Lock size={16} color={colors.textTertiary} />
+                </View>
+              ) : (
+                <>
+                  <TouchableOpacity
+                    style={styles.dropdown}
+                    onPress={() => {
+                      setShowConsultantDropdown(!showConsultantDropdown);
+                      setShowRoleDropdown(false);
+                      setShowItemDropdown(false);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.dropdownValue, !pickedConsultant && { color: colors.textTertiary }]}>
+                      {pickedConsultant?.display_name ?? 'Anyone — open this to bidding'}
+                    </Text>
+                    <ChevronDown size={18} color={colors.textTertiary} />
+                  </TouchableOpacity>
+                  {showConsultantDropdown && (
+                    <ScrollView style={styles.dropdownList} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                      {/* Clearing the pick is what turns this back into a bid,
+                          so it has to be reachable from inside the list. */}
+                      <TouchableOpacity
+                        style={styles.dropdownItem}
+                        onPress={() => { setPickedId(null); setShowConsultantDropdown(false); }}
+                      >
+                        <Text style={[styles.dropdownItemText, !pickedId && { color: NAVY, fontWeight: '700' }]}>
+                          Anyone — open this to bidding
+                        </Text>
+                      </TouchableOpacity>
+                      {rosterForRole.length === 0 ? (
+                        <View style={styles.dropdownItem}>
+                          <Text style={styles.dropdownEmptyText}>
+                            No approved {hireRole.replace(/^Hire\s+/i, '').toLowerCase()} yet — leave this open to bidding.
+                          </Text>
+                        </View>
+                      ) : (
+                        rosterForRole.map((c) => (
+                          <TouchableOpacity
+                            key={c.id}
+                            style={styles.dropdownItem}
+                            onPress={() => { setPickedId(c.id); setShowConsultantDropdown(false); }}
+                          >
+                            <Text style={[
+                              styles.dropdownItemText,
+                              pickedId === c.id && { color: NAVY, fontWeight: '700' },
+                            ]}>
+                              {c.display_name}
+                            </Text>
+                            <Text style={styles.dropdownItemMeta}>
+                              {c.code}{c.base_price ? ` · from ₹${c.base_price.toLocaleString('en-IN')}` : ''}
+                            </Text>
+                          </TouchableOpacity>
+                        ))
+                      )}
+                    </ScrollView>
+                  )}
+                </>
               )}
             </View>
 
@@ -315,7 +431,7 @@ export default function AssignProjectScreen({ navigation, route }: any) {
               </TouchableOpacity>
               {showItemDropdown && (
                 <View style={styles.dropdownList}>
-                  {CREATIVE_ITEMS.map((item) => (
+                  {itemsForRole.map((item) => (
                     <TouchableOpacity
                       key={item}
                       style={styles.dropdownItem}
@@ -397,6 +513,47 @@ export default function AssignProjectScreen({ navigation, route }: any) {
             </View>
           )}
 
+          {/* ── Selected Consultant ──────────────────
+              Layout ported from HireConsultantScreen before that file was
+              deleted. Its hardcoded "4.9/5.0" did not survive the move — this
+              reads the same consultant_ratings view CreatorProfileScreen does,
+              and shows "New" rather than a flattering invention. */}
+          {targetConsultant && (
+            <View style={styles.consultantSection}>
+              <Text style={styles.consultantSectionLabel}>SELECTED CONSULTANT</Text>
+              <View style={styles.consultantCard}>
+                <View style={styles.consultantLeft}>
+                  {targetConsultant.avatar_url ? (
+                    <Image source={{ uri: targetConsultant.avatar_url }} style={styles.consultantAvatar} />
+                  ) : (
+                    <View style={[styles.consultantAvatar, styles.consultantAvatarFallback]}>
+                      <Text style={styles.consultantAvatarInit}>
+                        {targetConsultant.display_name.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.consultantName}>{targetConsultant.display_name}</Text>
+                    <View style={styles.consultantMeta}>
+                      <Text style={styles.consultantRole}>{hireRole.replace(/^Hire\s+/i, '')}</Text>
+                      {targetConsultant.is_approved && (
+                        <>
+                          <Text style={styles.consultantDot}>•</Text>
+                          <BadgeCheck size={12} color={TEAL} />
+                          <Text style={styles.consultantVerified}>Verified Pro</Text>
+                        </>
+                      )}
+                    </View>
+                  </View>
+                </View>
+                <RatingStars
+                  average={ratings[targetConsultant.user_id]?.average_rating}
+                  count={ratings[targetConsultant.user_id]?.review_count}
+                />
+              </View>
+            </View>
+          )}
+
           {/* ── Terms Checkbox ───────────────────── */}
           <TouchableOpacity
             style={styles.termsRow}
@@ -409,10 +566,21 @@ export default function AssignProjectScreen({ navigation, route }: any) {
               )}
             </View>
             <Text style={styles.termsText}>
-              I agree to the{' '}
-              <Text style={styles.termsLink}>Terms and Condition</Text>
-              {' '}for creative assignments.
+              I agree to the Terms and Condition for creative assignments.
             </Text>
+          </TouchableOpacity>
+
+          {/* The link was styled as one but had no onPress — the client was
+              being asked to agree to something they could not open. Its own
+              control rather than a tappable span inside the checkbox row: on a
+              consent checkbox, a tap that might both navigate AND tick the box
+              is not a risk worth taking for one line of layout. */}
+          <TouchableOpacity
+            style={styles.termsLinkRow}
+            onPress={() => navigation.navigate('Terms')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.termsLink}>Read the Terms and Conditions</Text>
           </TouchableOpacity>
 
           {/* ── Action Buttons ───────────────────── */}
@@ -471,32 +639,6 @@ const styles = StyleSheet.create({
   },
 
   // ── Header ─────────────────────────────────────────────────
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 20,
-  },
-  backBtn: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 18,
-    backgroundColor: '#fff',
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4 },
-      android: { elevation: 2 },
-    }),
-  },
-  dIcon: { width: 32, height: 32 },
-  headerTagline: {
-    flex: 1,
-    fontSize: 9,
-    fontFamily: fonts.medium,
-    color: colors.textTertiary,
-    letterSpacing: 1.0,
-  },
 
   // ── Title ──────────────────────────────────────────────────
   title: {
@@ -637,6 +779,35 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     color: colors.textPrimary,
   },
+  dropdownItemMeta: {
+    fontSize: fontSizes.xs + 1,
+    fontFamily: fonts.body,
+    color: colors.textTertiary,
+    marginTop: 2,
+  },
+  dropdownEmptyText: {
+    fontSize: fontSizes.sm + 1,
+    fontFamily: fonts.body,
+    color: colors.textTertiary,
+    lineHeight: 19,
+  },
+  dropdownLocked: {
+    backgroundColor: colors.sectionBg,
+  },
+
+  // ── Selected consultant card (ported from HireConsultantScreen) ──
+  consultantSection: { borderTopWidth: 1, borderTopColor: '#E5E7EB', paddingTop: 20, marginBottom: 20 },
+  consultantSectionLabel: { fontSize: 10, fontWeight: '700', fontFamily: fonts.heavy, color: colors.textTertiary, letterSpacing: 0.8, marginBottom: 12 },
+  consultantCard: { backgroundColor: '#fff', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: colors.borderCard, gap: 12 },
+  consultantLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  consultantAvatar: { width: 52, height: 52, borderRadius: 26 },
+  consultantAvatarFallback: { backgroundColor: TEAL, alignItems: 'center', justifyContent: 'center' },
+  consultantAvatarInit: { color: '#fff', fontSize: 18, fontWeight: '800', fontFamily: fonts.heavy },
+  consultantName: { fontSize: fontSizes.lg, fontWeight: '800', fontFamily: fonts.heavy, color: NAVY },
+  consultantMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  consultantRole: { fontSize: fontSizes.sm, fontFamily: fonts.body, color: colors.textSecondary },
+  consultantDot: { color: colors.textTertiary },
+  consultantVerified: { fontSize: fontSizes.sm, fontWeight: '700', fontFamily: fonts.heavy, color: TEAL },
 
   // ── Negotiation Card ───────────────────────────────────────
   negotiationCard: {
@@ -688,7 +859,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
-    marginBottom: 24,
+    marginBottom: 8,
+  },
+  termsLinkRow: {
+    alignSelf: 'flex-start',
+    marginLeft: 32,
+    paddingVertical: 6,
+    marginBottom: 18,
   },
   checkbox: {
     width: 20,

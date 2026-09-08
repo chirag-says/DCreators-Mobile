@@ -166,19 +166,6 @@ export default function HistoryScreen({ navigation }: any) {
 
   const displayProjects = activeTab === 'sales' ? salesProjects : allProjects;
 
-  if (loading) {
-    return (
-      <View style={styles.bg}>
-        <SafeAreaView style={styles.safe} edges={['top']}>
-          <TopHeader />
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        </SafeAreaView>
-      </View>
-    );
-  }
-
   const renderProjectRow = useCallback(({ item }: { item: Project }) => (
     <HistoryProjectRow
       project={item}
@@ -274,6 +261,19 @@ export default function HistoryScreen({ navigation }: any) {
       </>
     );
   }, [isConsultant, earnings, reviews]);
+
+  if (loading) {
+    return (
+      <View style={styles.bg}>
+        <SafeAreaView style={styles.safe} edges={['top']}>
+          <TopHeader />
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.bg}>

@@ -9,6 +9,7 @@ import React, { useState } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { colors, fonts, spacing, radii } from '../../styles/theme';
 import { RemoteAssets } from '../../lib/assets';
+import { CATEGORY_LABELS, type AssignmentCategory } from '../../lib/assignment';
 import type { CreatorCardViewModel } from '../../types/navigation';
 
 /** Cloudinary image map for default creator avatars */
@@ -31,6 +32,18 @@ const WORK_SAMPLE_FALLBACK: Record<string, string[]> = {
   artisan: [RemoteAssets.page3, RemoteAssets.page1],
 };
 
+/**
+ * Which placeholder a creator gets, derived from their id so it is the same
+ * everywhere they appear. It used to be their position in the section's list,
+ * which meant one creator showing up in two sections got two different work
+ * samples, and two *different* creators heading two sections got the same one.
+ */
+function fallbackIndex(id: string, len: number): number {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) | 0;
+  return Math.abs(hash) % len;
+}
+
 const CARD_WIDTH = 220;
 const CARD_HEIGHT = 260;
 const AVATAR_SIZE = 36;
@@ -38,12 +51,10 @@ const CAPTION_HEIGHT = 54;
 
 interface FeaturedCreatorCardProps {
   creator: CreatorCardViewModel;
-  /** Position within its section's horizontal scroll — cycles the work-sample fallback so cards don't repeat the same placeholder. */
-  index?: number;
   onPress: (creator: CreatorCardViewModel) => void;
 }
 
-function FeaturedCreatorCard({ creator, index = 0, onPress }: FeaturedCreatorCardProps) {
+function FeaturedCreatorCard({ creator, onPress }: FeaturedCreatorCardProps) {
   const hasRealAvatar = creator.avatar_url && creator.avatar_url.startsWith('http');
   const avatarUrl = hasRealAvatar
     ? creator.avatar_url!
@@ -51,7 +62,14 @@ function FeaturedCreatorCard({ creator, index = 0, onPress }: FeaturedCreatorCar
       (creator.avatar_public_id?.startsWith('http') ? creator.avatar_public_id : undefined);
 
   const workSamples = WORK_SAMPLE_FALLBACK[creator.category];
-  const workSampleFallback = workSamples?.[index % workSamples.length];
+  const workSampleFallback = workSamples?.[fallbackIndex(creator.id, workSamples.length)];
+
+  // The code (DSTME, D21SK) used to sit here. It is an internal identifier
+  // that means nothing to someone browsing for a photographer; the discipline
+  // is what they are actually scanning for. Same reasoning as removing Code
+  // and Product Code from CreatorProfileScreen's stats grid.
+  const disciplineLabel =
+    CATEGORY_LABELS[creator.category as AssignmentCategory] ?? creator.category;
 
   // Ordered candidates for the big image: the portrait-cropped variant made
   // for this exact card shape → a square portfolio shot → category
@@ -84,9 +102,9 @@ function FeaturedCreatorCard({ creator, index = 0, onPress }: FeaturedCreatorCar
           <Text style={styles.name} numberOfLines={1}>
             {creator.name}
           </Text>
-          <View style={styles.idPill}>
-            <Text style={styles.idPillText} numberOfLines={1}>
-              {creator.code}
+          <View style={styles.disciplinePill}>
+            <Text style={styles.disciplinePillText} numberOfLines={1}>
+              {disciplineLabel}
             </Text>
           </View>
         </View>
@@ -169,18 +187,20 @@ const styles = StyleSheet.create({
     fontFamily: fonts.heavy,
     textAlign: 'center',
   },
-  idPill: {
+  disciplinePill: {
     marginTop: 2,
     backgroundColor: 'rgba(27,58,92,0.08)',
     paddingHorizontal: 8,
     paddingVertical: 1,
     borderRadius: radii.full,
   },
-  idPillText: {
+  disciplinePillText: {
     fontSize: 10,
     fontWeight: '700',
     color: colors.primary,
     fontFamily: fonts.heavy,
-    letterSpacing: 0.5,
+    // The code was an all-caps ident that needed the extra tracking; a word
+    // like "Photographer" reads worse with it.
+    letterSpacing: 0.2,
   },
 });

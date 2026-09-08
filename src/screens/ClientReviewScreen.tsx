@@ -1,10 +1,12 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Platform, Image, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Image, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import TopHeader from '../components/TopHeader';
+import KeyboardAvoider from '../components/KeyboardAvoider';
+import { useSafeBottomPadding } from '../hooks/useSafeBottomPadding';
+import ScreenHeader from '../components/ScreenHeader';
 import { updateProjectStatus, fetchLatestSubmission, updateSubmissionFeedback } from '../services/projectService';
 import { sendNotification } from '../lib/notifications';
-import { ArrowLeft, Check, RotateCcw, Pause, X, MessageSquare } from 'lucide-react-native';
+import { Check, RotateCcw, Pause, X, MessageSquare } from 'lucide-react-native';
 import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
 
 // Next status per round when client approves
@@ -16,6 +18,7 @@ const APPROVE_NEXT: Record<string, string> = {
 
 export default function ClientReviewScreen({ navigation, route }: any) {
   const project = route?.params?.project;
+  const bottomPad = useSafeBottomPadding(12);
   const [submission, setSubmission] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeFile, setActiveFile] = useState(0);
@@ -148,17 +151,11 @@ export default function ClientReviewScreen({ navigation, route }: any) {
   return (
     <View style={styles.bg}>
       <SafeAreaView style={styles.safe} edges={['top']}>
-        <TopHeader />
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
+        <ScreenHeader title="Review Design" />
+        <KeyboardAvoider>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 140 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={styles.container}>
 
-            <View style={styles.titleRow}>
-              <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                <ArrowLeft size={20} color={colors.textPrimary} />
-              </TouchableOpacity>
-              <Text style={styles.pageTitle}>Review Design</Text>
-              <View style={{ width: 36 }} />
-            </View>
 
             {loading ? (
               <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 60 }} />
@@ -265,7 +262,7 @@ export default function ClientReviewScreen({ navigation, route }: any) {
 
         {/* Four-action bar — Approve / Revert / Hold / Cancel */}
         {submission && !submission.client_action && (
-          <View style={styles.actionBar}>
+          <View style={[styles.actionBar, { paddingBottom: bottomPad }]}>
             <View style={styles.actionRow}>
               <TouchableOpacity style={[styles.actionBtn, styles.revertBtn]} onPress={handleRevert} disabled={isSaving}>
                 <RotateCcw size={15} color={colors.primary} />
@@ -293,7 +290,7 @@ export default function ClientReviewScreen({ navigation, route }: any) {
 
         {/* Already actioned — show status */}
         {submission?.client_action && (
-          <View style={styles.actionedBar}>
+          <View style={[styles.actionedBar, { paddingBottom: bottomPad }]}>
             <Text style={styles.actionedText}>
               {submission.client_action === 'approve' ? '✅ Design Approved'
                 : submission.client_action === 'revert' ? '🔄 Changes Requested'
@@ -302,6 +299,7 @@ export default function ClientReviewScreen({ navigation, route }: any) {
             </Text>
           </View>
         )}
+        </KeyboardAvoider>
       </SafeAreaView>
     </View>
   );
@@ -312,9 +310,6 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   container: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm },
 
-  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.lg },
-  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.7)', alignItems: 'center', justifyContent: 'center' },
-  pageTitle: { fontSize: fontSizes.xl, fontFamily: fonts.heavy, color: colors.textPrimary },
 
   emptyState: { alignItems: 'center', marginTop: spacing['5xl'], gap: spacing.sm },
   emptyTitle: { fontSize: fontSizes.lg, fontFamily: fonts.heavy, color: colors.textSecondary },
@@ -364,7 +359,6 @@ const styles = StyleSheet.create({
   // Four-action bar
   actionBar: {
     paddingHorizontal: spacing.xl, paddingVertical: 12,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 12,
     backgroundColor: colors.cardBg, borderTopWidth: 1, borderTopColor: colors.borderCard,
     gap: spacing.sm,
   },
@@ -379,6 +373,6 @@ const styles = StyleSheet.create({
   approveBtn: { flexDirection: 'row', gap: spacing.sm, paddingVertical: 16, borderRadius: radii.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.success },
   approveBtnText: { color: colors.textOnPrimary, fontSize: fontSizes.md, fontWeight: '700', fontFamily: fonts.heavy },
 
-  actionedBar: { paddingHorizontal: spacing.xl, paddingVertical: 14, paddingBottom: Platform.OS === 'ios' ? 28 : 14, backgroundColor: colors.cardBg, borderTopWidth: 1, borderTopColor: colors.borderCard, alignItems: 'center' },
+  actionedBar: { paddingHorizontal: spacing.xl, paddingVertical: 14, backgroundColor: colors.cardBg, borderTopWidth: 1, borderTopColor: colors.borderCard, alignItems: 'center' },
   actionedText: { fontSize: fontSizes.base, fontFamily: fonts.heavy, color: colors.textPrimary },
 });

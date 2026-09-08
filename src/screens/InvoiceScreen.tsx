@@ -45,7 +45,7 @@ export default function InvoiceScreen({ navigation, route }: any) {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.cardBg }]} edges={['top']}>
-      <View style={styles.bg}>
+      <View style={styles.backgroundImage}>
 
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()}>

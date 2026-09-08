@@ -23,6 +23,7 @@ interface AuthState {
   fetchConsultantProfile: () => Promise<void>;
   setRole: (role: UserRole) => void;
   signOut: () => Promise<void>;
+  deleteAccount: () => Promise<{ success: boolean; error?: string }>;
   clearError: () => void;
 }
 
@@ -193,6 +194,46 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       currentRole: 'client',
       error: null,
     });
+  },
+
+  // Delete the account. Play requires this to be reachable from inside the
+  // app; the work itself happens in the delete-account Edge Function, which
+  // holds the service role key. The function reads the caller's identity from
+  // the access token, so there is nothing to pass and nothing to spoof.
+  deleteAccount: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        set({ isLoading: false });
+        return { success: false, error: 'You are not signed in.' };
+      }
+
+      const response = await fetch(
+        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/delete-account`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+            apikey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '',
+          },
+        },
+      );
+
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        set({ isLoading: false });
+        return { success: false, error: body.error || 'Could not delete the account.' };
+      }
+
+      await get().signOut();
+      set({ isLoading: false });
+      return { success: true };
+    } catch (err: any) {
+      set({ isLoading: false });
+      return { success: false, error: err?.message || 'Could not delete the account.' };
+    }
   },
 
   // Clear error

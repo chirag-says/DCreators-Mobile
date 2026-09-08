@@ -9,20 +9,34 @@ import type { ShopProduct } from '../types';
 /** Shop product with joined consultant info */
 export interface ShopProductWithConsultant extends ShopProduct {
   consultant_profiles?: {
+    user_id: string;
     display_name: string;
     code: string;
   } | null;
 }
 
 /**
- * Fetch all active shop products with consultant info.
+ * Fetch active shop products with consultant info.
+ *
+ * Pass `consultantId` (a consultant_profiles.id) to scope it to one creator's
+ * shop. Both the Shop button on CreatorProfileScreen and the shop view it
+ * opens go through here, so the button cannot appear over an empty shop —
+ * `is_active` and `kind` are applied once, in one place.
  */
-export async function fetchShopProducts(): Promise<ShopProductWithConsultant[]> {
-  const { data, error } = await supabase
+export async function fetchShopProducts(consultantId?: string): Promise<ShopProductWithConsultant[]> {
+  let request = supabase
     .from('shop_products')
-    .select('*, consultant_profiles(display_name, code)')
+    .select('*, consultant_profiles(user_id, display_name, code)')
     .eq('is_active', true)
-    .order('created_at', { ascending: false });
+    // The shop sells things. Showcase pieces have no price and are not for
+    // sale, so they belong on the creator's profile, not on a buying surface.
+    .eq('kind', 'listing');
+
+  if (consultantId) {
+    request = request.eq('consultant_id', consultantId);
+  }
+
+  const { data, error } = await request.order('created_at', { ascending: false });
 
   if (error) {
     console.error('[ShopService] fetchShopProducts error:', error.message);
@@ -36,12 +50,25 @@ export async function fetchShopProducts(): Promise<ShopProductWithConsultant[]> 
  * Fetch a consultant's own portfolio products (most recent first).
  * Pass `limit` to cap results (e.g. portfolio slots); omit for the full list.
  */
-export async function fetchConsultantProducts(consultantId: string, limit?: number): Promise<ShopProduct[]> {
+export async function fetchConsultantProducts(
+  consultantId: string,
+  limit?: number,
+  /**
+   * 'showcase' = portfolio pieces (home Profile tab), 'listing' = artwork for
+   * sale (SALES tab). Omit to get both, which is what the public-facing
+   * profile surfaces want.
+   */
+  kind?: 'showcase' | 'listing',
+): Promise<ShopProduct[]> {
   let request = supabase
     .from('shop_products')
     .select('*')
     .eq('consultant_id', consultantId)
     .order('created_at', { ascending: false });
+
+  if (kind) {
+    request = request.eq('kind', kind);
+  }
 
   if (limit) {
     request = request.limit(limit);

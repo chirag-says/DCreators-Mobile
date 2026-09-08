@@ -33,7 +33,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Camera } from 'lucide-react-native';
-import { AntDesign, FontAwesome } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuthStore } from '../store/useAuthStore';
 import { colors, fonts, fontSizes, spacing, radii } from '../styles/theme';
@@ -43,7 +42,6 @@ const { width } = Dimensions.get('window');
 
 // ─── Color tokens from Figma ────────────────────────────────
 const NAVY_CTA = '#1B3A5C';        // Navy "Sign in" button
-const FACEBOOK_BLUE = '#1877F2';    // Facebook brand blue
 const SEND_OTP_BG = '#7DD3C0';     // Teal/mint "Send OTP" pill
 
 export default function RegisterScreen({ navigation }: any) {
@@ -66,11 +64,6 @@ export default function RegisterScreen({ navigation }: any) {
 
   // ── Avatar picker ──────────────────────────────
   async function pickAvatar() {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Please allow access to your photos.');
-      return;
-    }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
@@ -112,11 +105,6 @@ export default function RegisterScreen({ navigation }: any) {
     }
   }
 
-  // ── Social auth placeholder ────────────────────
-  function handleSocialPress(provider: string) {
-    Alert.alert(`${provider} Sign In`, 'Coming soon! Use email to sign in for now.');
-  }
-
   return (
     <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
@@ -144,31 +132,9 @@ export default function RegisterScreen({ navigation }: any) {
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Create Your Account</Text>
 
-            {/* ── Social auth buttons ──────────────── */}
-            <TouchableOpacity
-              style={styles.googleBtn}
-              onPress={() => handleSocialPress('Google')}
-              activeOpacity={0.8}
-            >
-              <AntDesign name="google" size={20} color="#4285F4" />
-              <Text style={styles.googleText}>Create Your Account with Google</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.facebookBtn}
-              onPress={() => handleSocialPress('Facebook')}
-              activeOpacity={0.8}
-            >
-              <FontAwesome name="facebook" size={20} color="#fff" />
-              <Text style={styles.facebookText}>Facebook</Text>
-            </TouchableOpacity>
-
-            {/* ── OR divider ──────────────────────── */}
-            <View style={styles.orRow}>
-              <View style={styles.orLine} />
-              <Text style={styles.orText}>OR</Text>
-              <View style={styles.orLine} />
-            </View>
+            {/* The Google and Facebook buttons that stood here were removed
+                with the OR divider they separated: neither provider is
+                configured, so both only raised a "Coming soon" alert. */}
 
             {/* ── Profile photo upload ────────────── */}
             <TouchableOpacity style={styles.avatarRow} onPress={pickAvatar} activeOpacity={0.8}>
@@ -364,62 +330,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: spacing.xl,
     lineHeight: 36,
-  },
-
-  // ── Social buttons ───────────────────────────
-  googleBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.borderInput,
-    borderRadius: radii.md,
-    paddingVertical: 14,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: '#fff',
-    gap: spacing.md,
-    marginBottom: spacing.md,
-  },
-  googleText: {
-    fontSize: fontSizes.base,
-    fontFamily: fonts.medium,
-    color: colors.textPrimary,
-  },
-  facebookBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: FACEBOOK_BLUE,
-    borderRadius: radii.md,
-    paddingVertical: 14,
-    paddingHorizontal: spacing.lg,
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  facebookText: {
-    fontSize: fontSizes.base,
-    fontFamily: fonts.medium,
-    fontWeight: '600',
-    color: '#fff',
-  },
-
-  // ── OR divider ───────────────────────────────
-  orRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.xl,
-    gap: spacing.md,
-  },
-  orLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.border,
-  },
-  orText: {
-    fontSize: fontSizes.sm,
-    fontFamily: fonts.medium,
-    color: colors.textTertiary,
-    letterSpacing: 0.5,
   },
 
   // ── Avatar upload ────────────────────────────

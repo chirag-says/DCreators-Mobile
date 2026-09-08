@@ -48,17 +48,24 @@ const ShopProductCard = React.memo(function ShopProductCard({
   );
 });
 
-export default function ShopScreen({ navigation }: any) {
+export default function ShopScreen({ navigation, route }: any) {
+  // Scoped to one creator when opened from their profile's Shop button; the
+  // whole catalogue otherwise. One screen rather than a near-duplicate
+  // CreatorShopScreen, so product cards keep one style.
+  const consultantId: string | undefined = route?.params?.consultantId;
+  const consultantName: string | undefined = route?.params?.consultantName;
+  const isCreatorShop = !!consultantId;
+
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { fetchProducts(); }, []);
+  useEffect(() => { fetchProducts(); }, [consultantId]);
 
   async function fetchProducts() {
     try {
-      const data = await fetchShopProducts();
+      const data = await fetchShopProducts(consultantId);
       const dbProducts = data.map((p: any) => ({
         id: p.id,
         title: p.title,
@@ -100,7 +107,9 @@ export default function ShopScreen({ navigation }: any) {
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <ChevronLeft size={28} color="#111" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Creative Shop</Text>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {isCreatorShop ? `${consultantName ?? 'Creator'}'s Shop` : 'Creative Shop'}
+          </Text>
           <TouchableOpacity style={styles.cartBtn}>
             <ShoppingBag size={24} color="#111" />
           </TouchableOpacity>
@@ -149,24 +158,27 @@ export default function ShopScreen({ navigation }: any) {
           renderItem={renderProduct}
           ListHeaderComponent={
             <>
-              {/* Featured Banner */}
-              <View style={styles.featuredSection}>
-                <ImageBackground source={{ uri: RemoteAssets.photographer }} style={styles.featuredCard} imageStyle={{ opacity: 0.6 }}>
-                  <View style={[styles.featuredContent, { backgroundColor: 'rgba(67, 56, 202, 0.7)' }]}>
-                    <Text style={styles.featuredBadge}>FEATURED BUNDLE</Text>
-                    <Text style={styles.featuredTitle}>The Ultimate Designer's Toolkit 2026</Text>
-                    <Text style={styles.featuredPrice}>₹4,999 <Text style={styles.strikethrough}>₹9,999</Text></Text>
-                    <TouchableOpacity style={styles.buyBtn}>
-                      <Text style={styles.buyBtnText}>Shop Now</Text>
-                    </TouchableOpacity>
-                  </View>
-                </ImageBackground>
-              </View>
+              {/* A global promo bundle has nothing to do with one creator's
+                  work, so the banner is catalogue-only. */}
+              {!isCreatorShop && (
+                <View style={styles.featuredSection}>
+                  <ImageBackground source={{ uri: RemoteAssets.photographer }} style={styles.featuredCard} imageStyle={{ opacity: 0.6 }}>
+                    <View style={[styles.featuredContent, { backgroundColor: 'rgba(67, 56, 202, 0.7)' }]}>
+                      <Text style={styles.featuredBadge}>FEATURED BUNDLE</Text>
+                      <Text style={styles.featuredTitle}>The Ultimate Designer's Toolkit 2026</Text>
+                      <Text style={styles.featuredPrice}>₹4,999 <Text style={styles.strikethrough}>₹9,999</Text></Text>
+                      <TouchableOpacity style={styles.buyBtn}>
+                        <Text style={styles.buyBtnText}>Shop Now</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </ImageBackground>
+                </View>
+              )}
 
               {/* Section Header */}
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>
-                  {activeCategory === 'All' ? 'Trending Assets' : activeCategory}
+                  {activeCategory !== 'All' ? activeCategory : isCreatorShop ? 'For Sale' : 'Trending Assets'}
                 </Text>
                 <Text style={styles.countText}>{filteredProducts.length} items</Text>
               </View>
@@ -179,7 +191,11 @@ export default function ShopScreen({ navigation }: any) {
               <View style={{ alignItems: 'center', paddingVertical: 60 }}>
                 <ShoppingBag size={56} color={colors.borderInput} />
                 <Text style={{ fontSize: 16, fontWeight: '700', color: colors.textSecondary, marginTop: 16, fontFamily: fontHeavy }}>No products yet</Text>
-                <Text style={{ fontSize: 13, color: colors.textTertiary, fontFamily: fontBody, marginTop: 4 }}>Products listed by creators will appear here</Text>
+                <Text style={{ fontSize: 13, color: colors.textTertiary, fontFamily: fontBody, marginTop: 4 }}>
+                  {isCreatorShop
+                    ? `${consultantName ?? 'This creator'} has nothing listed for sale right now`
+                    : 'Products listed by creators will appear here'}
+                </Text>
               </View>
             )
           }

@@ -75,7 +75,7 @@ export default function SavedCreatorsScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.cardBg }]} edges={['top']}>
-      <View style={styles.bg}>
+      <View style={styles.backgroundImage}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <ChevronLeft size={28} color={colors.textPrimary} />
@@ -120,6 +120,7 @@ export default function SavedCreatorsScreen({ navigation }: any) {
                       expertise: creator.expertise,
                       category: creator.category,
                       base_price: creator.base_price,
+                      price_unit: creator.price_unit,
                       avatar_url: creator.avatar_url,
                       portfolio_images: creator.portfolio_images,
                     }

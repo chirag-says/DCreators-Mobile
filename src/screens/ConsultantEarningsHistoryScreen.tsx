@@ -10,38 +10,43 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Image, ActivityIndicator, RefreshControl, Platform,
+  Image, ActivityIndicator, RefreshControl, Platform, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { TrendingUp, ShoppingBag, Briefcase, Star } from 'lucide-react-native';
+import { TrendingUp, ShoppingBag, Star, Tag, Plus, Edit3, Trash2 } from 'lucide-react-native';
 import TopHeader from '../components/TopHeader';
 import { useAuthStore } from '../store/useAuthStore';
 import { fetchCompletedArtworkSales } from '../services/artworkService';
-import { fetchCompletedProjectsForEarnings, fetchRecentReviewsWithReviewer } from '../services/projectService';
+import { fetchRecentReviewsWithReviewer } from '../services/projectService';
+import { fetchConsultantProducts, deleteShopProduct } from '../services/shopService';
 import { colors, fonts, fontSizes, spacing, radii } from '../styles/theme';
+import ConsultantDashboard from '../components/dashboard/ConsultantDashboard';
 
 const NAVY   = '#1B3A5C';
 const ORANGE = '#E87B35';
 const TEAL   = '#3D9B8F';
 const BG     = '#EDF1F5';
 
-type Tab = 'sales' | 'projects';
-
+// This screen is about selling artwork and nothing else. Project work lives on
+// the home Project Dashboard and the PROJECTS tab; it used to be duplicated
+// here behind a toggle, which meant two places disagreed about the same jobs.
 export default function ConsultantEarningsHistoryScreen({ navigation }: any) {
   const consultantProfile = useAuthStore(s => s.consultantProfile);
 
-  const [tab,       setTab]       = useState<Tab>('sales');
   const [sales,     setSales]     = useState<any[]>([]);
-  const [projects,  setProjects]  = useState<any[]>([]);
+  const [listings,  setListings]  = useState<any[]>([]);
   const [reviews,   setReviews]   = useState<any[]>([]);
   const [loading,   setLoading]   = useState(true);
   const [refreshing,setRefreshing]= useState(false);
 
-  const artSalesTotal   = sales.reduce((acc, s) => acc + (s.artwork_price ?? 0), 0);
-  const projectsTotal   = projects.reduce((acc, p) => acc + (p.final_offer ?? p.budget ?? 0), 0);
-  const overallEarnings = artSalesTotal + projectsTotal;
+  const artSalesTotal = sales.reduce((acc, s) => acc + (s.artwork_price ?? 0), 0);
 
   useEffect(() => { fetchAll(); }, []);
+
+  useEffect(() => {
+    const unsub = navigation.addListener('focus', fetchAll);
+    return unsub;
+  }, [navigation]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -52,17 +57,29 @@ export default function ConsultantEarningsHistoryScreen({ navigation }: any) {
     if (!consultantProfile?.user_id) { setLoading(false); return; }
     setLoading(true);
     try {
-      const [salesData, projectData, reviewData] = await Promise.all([
+      const [salesData, listingData, reviewData] = await Promise.all([
         fetchCompletedArtworkSales(consultantProfile.user_id),
-        fetchCompletedProjectsForEarnings(consultantProfile.user_id),
+        consultantProfile.id
+          ? fetchConsultantProducts(consultantProfile.id, undefined, 'listing')
+          : Promise.resolve([]),
         fetchRecentReviewsWithReviewer(consultantProfile.user_id),
       ]);
 
       setSales(salesData);
-      setProjects(projectData);
+      setListings(listingData);
       setReviews(reviewData);
     } catch {}
     finally { setLoading(false); }
+  }
+
+  async function handleDeleteListing(p: any) {
+    Alert.alert('Delete Listing', `Remove "${p.title}" from sale?`, [
+      { text: 'Cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        await deleteShopProduct(p.id);
+        setListings(prev => prev.filter(x => x.id !== p.id));
+      }},
+    ]);
   }
 
   function formatDate(iso: string) {
@@ -84,31 +101,83 @@ export default function ConsultantEarningsHistoryScreen({ navigation }: any) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={TEAL} />}
       >
         {/* ── Hero ── */}
-        <Text style={s.heroTitle}>Sales History</Text>
-        <Text style={s.heroSub}>Track your artistic legacy and consultant milestones across the Dcreators ecosystem.</Text>
+        <Text style={s.heroTitle}>Sales</Text>
+        <Text style={s.heroSub}>
+          Everything about selling your artwork: incoming requests, what you have
+          listed, and what has sold. Project work lives on your Projects tab.
+        </Text>
 
-        {/* ── Tab toggle ── */}
-        <View style={s.tabBar}>
-          {(['sales', 'projects'] as Tab[]).map(t => (
-            <TouchableOpacity
-              key={t}
-              style={[s.tabBtn, tab === t && s.tabBtnActive]}
-              onPress={() => setTab(t)}
-              activeOpacity={0.8}
-            >
-              <Text style={[s.tabBtnText, tab === t && s.tabBtnTextActive]}>
-                {t === 'sales' ? 'Sales' : 'Projects'}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        {/* ── Incoming purchase requests ──
+            Moved here from the Creator's Dashboard sales tab. Requests need an
+            answer, so they sit above the history rather than under it. */}
+        <View style={s.pendingBlock}>
+          <ConsultantDashboard navigation={navigation} />
         </View>
 
         {loading ? (
           <ActivityIndicator size="large" color={TEAL} style={{ marginTop: 40 }} />
         ) : (
           <>
-            {/* ── Sales tab ── */}
-            {tab === 'sales' && (
+            {/* ── What's up for sale ──
+                The creator's own add-and-manage surface for sale listings.
+                Separate from the five showcase pieces on the home Profile tab:
+                those exist to win a hire, these exist to be bought. */}
+            <View style={s.listingsBlock}>
+              <View style={s.sectionHeader}>
+                <View style={s.sectionHeaderLeft}>
+                  <Tag size={18} color={NAVY} />
+                  <Text style={s.sectionTitle}>My Artwork Listings</Text>
+                </View>
+                <TouchableOpacity
+                  style={s.addBtn}
+                  onPress={() => navigation.navigate('AddEditProduct')}
+                  activeOpacity={0.85}
+                >
+                  <Plus size={15} color="#fff" />
+                  <Text style={s.addBtnText}>Add</Text>
+                </TouchableOpacity>
+              </View>
+
+              {listings.length === 0 ? (
+                <View style={s.emptyCard}>
+                  <Text style={s.emptyText}>
+                    Nothing listed for sale yet. Add a piece and buyers can request it.
+                  </Text>
+                </View>
+              ) : (
+                listings.map(p => (
+                  <View key={p.id} style={s.saleCard}>
+                    <View style={s.saleIconWrap}>
+                      {p.images?.[0]
+                        ? <Image source={{ uri: p.images[0] }} style={s.saleImg} />
+                        : <View style={s.saleIconCircle}><Tag size={18} color={TEAL} /></View>
+                      }
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.saleTitle} numberOfLines={1}>{p.title}</Text>
+                      <Text style={s.saleDate}>{p.size ?? 'Size not set'}</Text>
+                      <Text style={[s.saleDate, { color: p.available === false ? colors.error : TEAL }]}>
+                        {p.available === false ? 'Not for sale' : 'Available for sale'}
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end', gap: 8 }}>
+                      <Text style={s.saleAmount}>₹ {Number(p.price ?? 0).toLocaleString('en-IN')}</Text>
+                      <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <TouchableOpacity onPress={() => navigation.navigate('AddEditProduct', { product: p })}>
+                          <Edit3 size={16} color={NAVY} />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => handleDeleteListing(p)}>
+                          <Trash2 size={16} color={colors.error} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
+
+            {/* ── Completed artwork sales ── */}
+            {(
               <View>
                 <View style={s.sectionHeader}>
                   <View style={s.sectionHeaderLeft}>
@@ -149,56 +218,26 @@ export default function ConsultantEarningsHistoryScreen({ navigation }: any) {
               </View>
             )}
 
-            {/* ── Projects tab ── */}
-            {tab === 'projects' && (
-              <View>
-                <View style={s.sectionHeader}>
-                  <View style={s.sectionHeaderLeft}>
-                    <Briefcase size={18} color={NAVY} />
-                    <Text style={s.sectionTitle}>Completed Projects</Text>
-                  </View>
-                  <View style={s.totalBadge}>
-                    <Text style={s.totalBadgeText}>Total: {formatAmount(projectsTotal)}</Text>
-                  </View>
-                </View>
-                {projects.length === 0 ? (
-                  <View style={s.emptyCard}><Text style={s.emptyText}>No completed projects yet.</Text></View>
-                ) : (
-                  projects.map(p => (
-                    <View key={p.id} style={s.saleCard}>
-                      <View style={s.saleIconCircle}><Briefcase size={18} color={TEAL} /></View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.saleTitle} numberOfLines={2}>{p.assignment_brief}</Text>
-                        <Text style={s.saleDate}>Client: {p.client?.name ?? '—'}</Text>
-                        <Text style={s.saleDate}>Completed {formatDate(p.updated_at)}</Text>
-                      </View>
-                      <View style={{ alignItems: 'flex-end', gap: 6 }}>
-                        <Text style={s.saleAmount}>₹ {(p.final_offer ?? p.budget ?? 0).toLocaleString('en-IN')}</Text>
-                        <View style={s.completedBadge}><Text style={s.completedBadgeText}>Completed</Text></View>
-                      </View>
-                    </View>
-                  ))
-                )}
-              </View>
-            )}
-
             {/* ── Overall Earnings card ── */}
             <View style={s.earningsCard}>
-              <Text style={s.earningsLabel}>OVERALL EARNINGS</Text>
-              <Text style={s.earningsValue}>{formatAmount(overallEarnings)}</Text>
+              {/* Artwork only. Project earnings belong to the project surfaces;
+                  totalling them here is what made this screen look like a
+                  second, competing project dashboard. */}
+              <Text style={s.earningsLabel}>ARTWORK EARNINGS</Text>
+              <Text style={s.earningsValue}>{formatAmount(artSalesTotal)}</Text>
               <View style={s.growthBadge}>
                 <TrendingUp size={14} color="#fff" />
-                <Text style={s.growthText}>12% growth this month</Text>
+                <Text style={s.growthText}>{sales.length} piece{sales.length === 1 ? '' : 's'} sold</Text>
               </View>
               <View style={s.earningsDivider} />
               <View style={s.earningsBreakdown}>
                 <View>
-                  <Text style={s.breakdownLabel}>ART SALES</Text>
-                  <Text style={s.breakdownValue}>{formatAmount(artSalesTotal)}</Text>
+                  <Text style={s.breakdownLabel}>LISTED</Text>
+                  <Text style={s.breakdownValue}>{listings.length}</Text>
                 </View>
                 <View>
-                  <Text style={s.breakdownLabel}>PROJECTS</Text>
-                  <Text style={s.breakdownValue}>{formatAmount(projectsTotal)}</Text>
+                  <Text style={s.breakdownLabel}>SOLD</Text>
+                  <Text style={s.breakdownValue}>{sales.length}</Text>
                 </View>
               </View>
             </View>
@@ -240,12 +279,14 @@ const s = StyleSheet.create({
   scroll: { paddingHorizontal: 20, paddingBottom: 40 },
   heroTitle: { fontSize: 40, fontWeight: '900', fontFamily: fonts.heavy, color: NAVY, marginTop: 14, marginBottom: 10, lineHeight: 44 },
   heroSub: { fontSize: fontSizes.base, fontFamily: fonts.body, color: colors.textSecondary, lineHeight: 22, marginBottom: 20 },
+  pendingBlock: { marginBottom: 24, paddingBottom: 24, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.08)' },
+  listingsBlock: { marginBottom: 24, paddingBottom: 24, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.08)' },
+  addBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: NAVY, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8,
+  },
+  addBtnText: { color: '#fff', fontSize: fontSizes.sm, fontWeight: '700', fontFamily: fonts.heavy },
   // Tab
-  tabBar: { flexDirection: 'row', backgroundColor: '#E5E7EB', borderRadius: 12, padding: 4, marginBottom: 24 },
-  tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10 },
-  tabBtnActive: { backgroundColor: NAVY },
-  tabBtnText: { fontSize: fontSizes.base, fontWeight: '700', fontFamily: fonts.heavy, color: colors.textSecondary },
-  tabBtnTextActive: { color: '#fff' },
   // Section header
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
   sectionHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },

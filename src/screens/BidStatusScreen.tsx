@@ -84,7 +84,9 @@ export default function BidStatusScreen({ navigation, route }: any) {
     if (!candidate.project_id) return;
     const project = await fetchProjectById(candidate.project_id);
     if (!project) return;
-    navigation.navigate('Main', { screen: 'CreatorWorkorder', params: { project } });
+    // CLIENT view — their own project surface (advance payment / review timeline),
+    // not the consultant's CreatorWorkorder.
+    navigation.navigate('ClientWorkorder', { project });
   }
 
   return (

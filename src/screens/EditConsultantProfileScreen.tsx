@@ -1,15 +1,18 @@
 ﻿import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, TextInput, TouchableOpacity, Platform,
+  View, Text, StyleSheet, TextInput, TouchableOpacity,
   ScrollView, Image, Alert, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import TopHeader from '../components/TopHeader';
-import { ChevronDown, ChevronRight, Camera, Square, CheckSquare, X, ImagePlus, Save, ArrowLeft } from 'lucide-react-native';
+import KeyboardAvoider from '../components/KeyboardAvoider';
+import { useSafeBottomPadding } from '../hooks/useSafeBottomPadding';
+import ScreenHeader from '../components/ScreenHeader';
+import { ChevronDown, ChevronRight, Camera, Square, CheckSquare, X, ImagePlus, Save } from 'lucide-react-native';
 import { useAuthStore } from '../store/useAuthStore';
 import { updateConsultantProfileByUserId } from '../services/consultantService';
 import * as ImagePicker from 'expo-image-picker';
 import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
+import { EXPERIENCE_OPTIONS } from '../config/profileOptions';
 
 
 const CATEGORIES = [
@@ -17,10 +20,9 @@ const CATEGORIES = [
   'Sculpture', 'Traditional Craft', 'Illustration',
 ];
 
-const EXPERIENCE_OPTIONS = ['1-3 years', '3-5 years', '5-10 years', '10+ years'];
-
 export default function EditConsultantProfileScreen({ navigation }: any) {
   const { consultantProfile, profile, fetchConsultantProfile } = useAuthStore();
+  const bottomPad = useSafeBottomPadding(14);
   const [isSaving, setIsSaving] = useState(false);
   const [showExpDropdown, setShowExpDropdown] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
@@ -70,11 +72,6 @@ export default function EditConsultantProfileScreen({ navigation }: any) {
   }
 
   async function pickProfileImage() {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Please allow photo library access.');
-      return;
-    }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
@@ -87,11 +84,6 @@ export default function EditConsultantProfileScreen({ navigation }: any) {
   }
 
   async function pickPortfolioImage(index: number) {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Please allow photo library access.');
-      return;
-    }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
@@ -213,18 +205,11 @@ export default function EditConsultantProfileScreen({ navigation }: any) {
   return (
     <View style={styles.bg}>
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-        <TopHeader />
+        <ScreenHeader title="Edit Profile" />
 
-        <ScrollView style={styles.mainScroll} contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+        <KeyboardAvoider>
+        <ScrollView style={styles.mainScroll} contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
-          {/* Back + Title */}
-          <View style={styles.titleRow}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-              <ArrowLeft size={22} color="#1F2937" />
-            </TouchableOpacity>
-            <Text style={styles.pageTitle}>Edit Profile</Text>
-            <View style={{ width: 36 }} />
-          </View>
 
           {/* Profile Image */}
           <View style={styles.avatarSection}>
@@ -406,7 +391,7 @@ export default function EditConsultantProfileScreen({ navigation }: any) {
         </ScrollView>
 
         {/* Update Button */}
-        <View style={styles.actionBar}>
+        <View style={[styles.actionBar, { paddingBottom: bottomPad }]}>
           <TouchableOpacity style={styles.cancelBtn} onPress={() => navigation.goBack()}>
             <Text style={styles.cancelBtnText}>Cancel</Text>
           </TouchableOpacity>
@@ -421,6 +406,7 @@ export default function EditConsultantProfileScreen({ navigation }: any) {
             )}
           </TouchableOpacity>
         </View>
+        </KeyboardAvoider>
       </SafeAreaView>
     </View>
   );
@@ -430,9 +416,6 @@ const styles = StyleSheet.create({
   bg: { flex: 1, backgroundColor: colors.screenBg },
   safe: { flex: 1 },
   mainScroll: { flex: 1 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.xl, paddingVertical: 14 },
-  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.7)', alignItems: 'center', justifyContent: 'center' },
-  pageTitle: { fontSize: fontSizes['2xl'], fontFamily: fonts.heavy, color: colors.textPrimary },
   avatarSection: { alignItems: 'center', marginBottom: spacing.xl },
   avatarFrame: { width: 110, height: 130, borderRadius: radii.md, borderWidth: 2.5, borderColor: '#E8854A', overflow: 'hidden', backgroundColor: colors.sectionBg },
   avatarImage: { width: '100%', height: '100%' },
@@ -462,7 +445,7 @@ const styles = StyleSheet.create({
   replaceBtn: { position: 'absolute', bottom: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: radii.md, width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
   portfolioEmpty: { flex: 1, backgroundColor: colors.sectionBg, borderWidth: 2, borderColor: colors.borderInput, borderStyle: 'dashed', borderRadius: radii.md, alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
   slotLabel: { fontSize: fontSizes.xs, fontFamily: fonts.medium, color: colors.textTertiary },
-  actionBar: { flexDirection: 'row', gap: spacing.md, paddingHorizontal: spacing.xl, paddingVertical: 14, paddingBottom: Platform.OS === 'ios' ? 34 : 14, backgroundColor: colors.cardBg, borderTopWidth: 1, borderTopColor: colors.borderCard },
+  actionBar: { flexDirection: 'row', gap: spacing.md, paddingHorizontal: spacing.xl, paddingVertical: 14, backgroundColor: colors.cardBg, borderTopWidth: 1, borderTopColor: colors.borderCard },
   cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: radii.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.sectionBg, borderWidth: 1, borderColor: colors.border },
   cancelBtnText: { fontSize: fontSizes.md, fontFamily: fonts.medium, color: colors.textSecondary },
   updateBtn: { flex: 2, flexDirection: 'row', gap: spacing.sm, paddingVertical: 14, borderRadius: radii.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.success },

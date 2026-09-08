@@ -39,7 +39,7 @@ export default function MessagesListScreen({ navigation }: any) {
       const projects = await fetchMessagingProjects({
         role: currentRole === 'consultant' ? 'consultant' : 'client',
         clientId: profile.id,
-        consultantProfileId: consultantProfile?.id,
+        consultantUserId: consultantProfile?.user_id ?? profile.id,
       });
       if (projects.length === 0) {
         setChats([]);
@@ -147,7 +147,7 @@ export default function MessagesListScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.cardBg }]} edges={['top']}>
-      <View style={styles.bg}>
+      <View style={styles.backgroundImage}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <ChevronLeft size={28} color={colors.textPrimary} />

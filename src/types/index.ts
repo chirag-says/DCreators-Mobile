@@ -3,6 +3,8 @@
 // Master type definitions for all entities
 // ============================================
 
+import type { PriceUnit, DurationUnit } from '../lib/booking';
+
 export interface Profile {
   id: string;
   name: string;
@@ -34,16 +36,16 @@ export interface ConsultantProfile {
   portfolio_card_image: string | null;
   portfolio_banner_image: string | null;
   base_price: number | null;
+  /** What base_price is quoted against. NOT NULL in the DB, defaults per_project. */
+  price_unit: PriceUnit;
   is_approved: boolean;
   is_active: boolean;
-  // KYC / banking — collected on the Create Creator's Account screen
   institution_name: string | null;
-  aadhar_number: string | null;
-  pan_number: string | null;
-  bank_name: string | null;
-  ifsc_code: string | null;
-  bank_account_number: string | null;
   terms_pdf_url: string | null;
+  // Aadhaar, PAN and bank details are NOT here. consultant_profiles is
+  // publicly readable for approved creators, so they live on consultant_kyc
+  // instead, behind an owner-only policy. The app writes them during
+  // onboarding and never reads them back.
   // Category-specific onboarding answers — see src/config/categoryQuestions.ts
   // for the question schema each category's answers are keyed against.
   category_details: Record<string, unknown> | null;
@@ -86,8 +88,22 @@ export interface Project {
   // The date being booked (e.g. the wedding/shoot day) — distinct from
   // `deadline`, which is the delivery deadline for the finished work.
   event_date: string | null;
+  // Call time on event_date, and how long the consultant is held for. All null
+  // on the bidding path and on rows predating 20260829120100 — the direct
+  // booking screen is the only flow that collects them.
+  start_time: string | null;
+  duration_value: number | null;
+  duration_unit: DurationUnit | null;
   budget: number;
-  final_offer: number | null;    // negotiated price (set in CONSULTANT_NEGOTIATION_SCREEN)
+  // The CURRENT proposed/agreed price under negotiation. Starts equal to
+  // `budget` (client's opening offer); updated as either side counters; frozen
+  // once `price_agreed` is true. Read as `final_offer ?? budget` everywhere.
+  final_offer: number | null;
+  // Who made the current pending price proposal. null only on drafts.
+  offer_by: 'client' | 'consultant' | null;
+  // True once both parties accepted the same price. Gates advance payment:
+  // `assigned -> advance_pending` is only legal when this is true.
+  price_agreed: boolean;
   status: ProjectStatus;
   progress_percent: number;
   work_order_data: Record<string, unknown> | null; // immutable after work_order_generated
@@ -105,6 +121,8 @@ export interface BidRequest {
   id: string;
   client_id: string;
   category: ConsultantCategory;
+  /** Concrete deliverable ("Logo Design"). Null on rows created before the column existed. */
+  creative_item: string | null;
   assignment_brief: string;
   event_date: string | null;
   budget: number;
@@ -118,7 +136,8 @@ export interface BidCandidate {
   bid_request_id: string;
   consultant_id: string; // consultant_profiles.id — NOT auth user_id
   priority_rank: number;
-  quoted_price: number;
+  quoted_price: number;        // CURRENT proposed/agreed price for this candidate
+  offer_by: 'client' | 'consultant'; // who made the current pending proposal
   status: BidCandidateStatus;
   project_id: string | null; // set once accepted
   created_at: string;
@@ -172,6 +191,8 @@ export interface ShopProduct {
   images: string[] | null;
   category: string | null;
   is_active: boolean;
+  /** 'showcase' = portfolio piece (home Profile tab); 'listing' = for sale (SALES tab). */
+  kind: 'showcase' | 'listing';
   created_at: string;
 }
 

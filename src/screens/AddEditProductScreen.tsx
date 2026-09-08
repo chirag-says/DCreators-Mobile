@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Image, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Image, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Camera, X, Check, Package } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -23,6 +23,9 @@ export default function AddEditProductScreen({ navigation, route }: any) {
   const [description, setDescription] = useState(existingProduct?.description || '');
   const [price, setPrice] = useState(existingProduct?.price ? String(existingProduct.price) : '');
   const [category, setCategory] = useState(existingProduct?.category || '');
+  const [size, setSize] = useState((existingProduct as any)?.size || '');
+  const [medium, setMedium] = useState((existingProduct as any)?.medium || '');
+  const [available, setAvailable] = useState((existingProduct as any)?.available !== false);
   const [images, setImages] = useState<string[]>(existingProduct?.images || []);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -33,12 +36,10 @@ export default function AddEditProductScreen({ navigation, route }: any) {
       return;
     }
 
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Please grant photo library access to upload images.');
-      return;
-    }
-
+    // No permission request: launchImageLibraryAsync goes through the system
+    // photo picker, which hands back only the images the user selects. Asking
+    // for READ_MEDIA_IMAGES would put the app in Play's broad-photo-access
+    // declaration track for no gain. Same in every other picker call site.
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
@@ -120,6 +121,12 @@ export default function AddEditProductScreen({ navigation, route }: any) {
         images,
         consultant_id: consultantProfile.id,
         is_active: true,
+        size: size.trim() || null,
+        medium: medium.trim() || null,
+        available,
+        // This is the sale flow. Showcase pieces are added from the home
+        // Profile tab and are capped at five; listings are not.
+        kind: 'listing' as const,
       };
 
       if (isEditing) {
@@ -237,6 +244,44 @@ export default function AddEditProductScreen({ navigation, route }: any) {
             keyboardType="number-pad"
           />
 
+          {/* ── Physical detail a buyer needs before committing ── */}
+          <Text style={styles.label}>Size</Text>
+          <TextInput
+            style={styles.input}
+            value={size}
+            onChangeText={setSize}
+            placeholder='e.g. 24 × 36 inches'
+            placeholderTextColor={colors.textTertiary}
+            maxLength={60}
+          />
+
+          <Text style={styles.label}>Medium</Text>
+          <TextInput
+            style={styles.input}
+            value={medium}
+            onChangeText={setMedium}
+            placeholder="e.g. Oil on canvas"
+            placeholderTextColor={colors.textTertiary}
+            maxLength={60}
+          />
+
+          {/* ── Availability. Lets a creator keep a listing without leaving it
+                 open to purchase, e.g. while a commission is in progress. ── */}
+          <View style={styles.availRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Available for sale</Text>
+              <Text style={styles.availHint}>
+                Turn off to keep the listing but stop new purchase requests.
+              </Text>
+            </View>
+            <Switch
+              value={available}
+              onValueChange={setAvailable}
+              thumbColor="#fff"
+              trackColor={{ true: colors.teal, false: '#CBD5E1' }}
+            />
+          </View>
+
           {/* ── Category ── */}
           <Text style={styles.label}>Category *</Text>
           <View style={styles.categoryGrid}>
@@ -329,6 +374,8 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.base, fontFamily: fonts.body, color: colors.textPrimary,
   },
   textArea: { minHeight: 100, textAlignVertical: 'top', paddingTop: 14 },
+  availRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.md },
+  availHint: { fontSize: fontSizes.xs, fontFamily: fonts.body, color: colors.textTertiary, lineHeight: 16 },
   charCount: {
     textAlign: 'right', fontSize: fontSizes.xs, color: colors.textTertiary,
     fontFamily: fonts.medium, marginTop: 4,

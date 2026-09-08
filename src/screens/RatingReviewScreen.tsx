@@ -1,11 +1,12 @@
 ﻿import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Platform, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import KeyboardAvoider from '../components/KeyboardAvoider';
+import { useSafeBottomPadding } from '../hooks/useSafeBottomPadding';
 import { ChevronLeft, Star, Send } from 'lucide-react-native';
 import { useAuthStore } from '../store/useAuthStore';
 import { sendNotification } from '../lib/notifications';
 import { createReview } from '../services/projectService';
-import { fetchConsultantUserId } from '../services/consultantService';
 import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
 
 
@@ -14,6 +15,7 @@ const QUICK_TAGS = ['Professional', 'On Time', 'Creative', 'Responsive', 'Great 
 export default function RatingReviewScreen({ navigation, route }: any) {
   const project = route?.params?.project;
   const profile = useAuthStore((s) => s.profile);
+  const bottomPad = useSafeBottomPadding(spacing.lg);
 
   const [rating, setRating] = useState(0);
   const [review, setReview] = useState('');
@@ -47,19 +49,16 @@ export default function RatingReviewScreen({ navigation, route }: any) {
         tags: selectedTags.length > 0 ? selectedTags : null,
       });
 
-      // Notify consultant
+      // Notify consultant (project.consultant_id is already the consultant's auth user_id)
       if (project.consultant_id) {
-        const consultantUserId = await fetchConsultantUserId(project.consultant_id);
-        if (consultantUserId) {
-          sendNotification({
-            userId: consultantUserId,
-            title: `${rating}★ Review Received`,
-            message: review.trim()
-              ? `"${review.trim().substring(0, 80)}..."`
-              : `Client rated your work ${rating}/5 stars.`,
-            type: 'review',
-          });
-        }
+        sendNotification({
+          userId: project.consultant_id,
+          title: `${rating}★ Review Received`,
+          message: review.trim()
+            ? `"${review.trim().substring(0, 80)}..."`
+            : `Client rated your work ${rating}/5 stars.`,
+          type: 'review',
+        });
       }
 
       Alert.alert(
@@ -91,7 +90,8 @@ export default function RatingReviewScreen({ navigation, route }: any) {
           <View style={{ width: 28 }} />
         </View>
 
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+        <KeyboardAvoider>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={styles.container}>
 
             {/* Summary Card */}
@@ -166,7 +166,7 @@ export default function RatingReviewScreen({ navigation, route }: any) {
         </ScrollView>
 
         {/* Submit Button */}
-        <View style={styles.actionsBar}>
+        <View style={[styles.actionsBar, { paddingBottom: bottomPad }]}>
           <TouchableOpacity
             style={[styles.submitBtn, rating === 0 && { backgroundColor: colors.borderInput }]}
             disabled={rating === 0 || submitting}
@@ -182,6 +182,7 @@ export default function RatingReviewScreen({ navigation, route }: any) {
             )}
           </TouchableOpacity>
         </View>
+        </KeyboardAvoider>
 
       </View>
     </SafeAreaView>
@@ -229,7 +230,7 @@ const styles = StyleSheet.create({
   tagTextActive: { color: colors.textOnPrimary, fontWeight: '700' },
 
   actionsBar: {
-    padding: spacing.lg, paddingBottom: Platform.OS === 'ios' ? 34 : spacing.lg,
+    padding: spacing.lg,
     backgroundColor: colors.cardBg, borderTopWidth: 1, borderTopColor: colors.borderCard,
   },
   submitBtn: {

@@ -6,8 +6,6 @@
  * next_screen: CONSULTANT_WORK_ORDER_SCREEN (consultant receives WO notification)
  * workflow_stage: advance_paid → work_order_generated
  *
- * Figma: CLIENT_GENERATE_WORK_ORDER_SCREEN.png
- *
  * Shows:
  *  - ✅ Payment Confirmed header
  *  - Transaction ID / Amount / Date
@@ -18,19 +16,14 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  ScrollView, ActivityIndicator, Alert, Platform,
+  ScrollView, ActivityIndicator, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { CheckCircle, Info, ArrowLeft } from 'lucide-react-native';
-import { Image } from 'react-native';
-import { supabase } from '../lib/supabase';
+import { CheckCircle, Info } from 'lucide-react-native';
+import ScreenHeader from '../components/ScreenHeader';
 import { updateProjectStatus } from '../services/projectService';
 import { sendNotification } from '../lib/notifications';
-import { colors, fonts, fontSizes, spacing, radii } from '../styles/theme';
-import { RemoteAssets } from '../lib/assets';
-
-const NAVY = '#1B3A5C';
-const TEAL = '#0D7F7A';
+import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
 
 export default function GenerateWorkOrderScreen({ navigation, route }: any) {
   const { project, txnId, payAmount } = route?.params ?? {};
@@ -94,147 +87,113 @@ export default function GenerateWorkOrderScreen({ navigation, route }: any) {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      {/* Top header */}
-      <View style={styles.topRow}>
-        <Image source={{ uri: RemoteAssets.dIcon }} style={styles.dIcon} resizeMode="contain" />
-        <Text style={styles.headerTagline}>Hire creatives. Buy art. Build ideas.</Text>
-      </View>
+    <View style={styles.bg}>
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <ScreenHeader title="Generate Work Order" />
 
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* ── Payment Confirmed header ─────────────────── */}
-        <View style={styles.successHeader}>
-          <View style={styles.checkCircle}>
-            <CheckCircle size={40} color="#fff" fill={TEAL} />
-          </View>
-          <Text style={styles.confirmedTitle}>Payment Confirmed</Text>
-          <Text style={styles.confirmedSubtitle}>
-            Thank you! Your payment has been{'\n'}successfully received.
-          </Text>
-        </View>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.scroll}
+          showsVerticalScrollIndicator={false}
+        >
 
-        {/* ── Transaction receipt card ─────────────────── */}
-        <View style={styles.receiptCard}>
-          <View style={styles.receiptRow}>
-            <Text style={styles.receiptLabel}>TRANSACTION ID</Text>
-            <Text style={styles.receiptValue} numberOfLines={1}>
-              {txnId || 'DC-77XC-901'}
+          {/* ── Payment Confirmed header ─────────────────── */}
+          <View style={styles.successHeader}>
+            <View style={styles.checkCircle}>
+              <CheckCircle size={40} color="#fff" fill={colors.teal} />
+            </View>
+            <Text style={styles.confirmedTitle}>Payment Confirmed</Text>
+            <Text style={styles.confirmedSubtitle}>
+              Thank you! Your payment has been{'\n'}successfully received.
             </Text>
           </View>
-          <View style={styles.receiptDivider} />
-          <View style={styles.receiptRow}>
-            <Text style={styles.receiptLabel}>AMOUNT PAID</Text>
-            <Text style={[styles.receiptValue, { color: TEAL }]}>₹{formattedAmount}</Text>
-          </View>
-          <View style={styles.receiptDivider} />
-          <View style={styles.receiptRow}>
-            <Text style={styles.receiptLabel}>DATE & TIME</Text>
-            <Text style={styles.receiptValue}>{formattedDate}</Text>
-          </View>
-        </View>
 
-        {/* ── Context paragraph ────────────────────────── */}
-        <Text style={styles.contextPara}>
-          This confirms receipt of the advance payment for the project. Artwork development is underway, and design variations will be shared periodically for review. The final deliverables will be completed within the agreed timeline. Thank you for your trust and support.
-        </Text>
+          {/* ── Transaction receipt card ─────────────────── */}
+          <View style={styles.receiptCard}>
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptLabel}>TRANSACTION ID</Text>
+              <Text style={styles.receiptValue} numberOfLines={1}>
+                {txnId || '—'}
+              </Text>
+            </View>
+            <View style={styles.receiptDivider} />
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptLabel}>AMOUNT PAID</Text>
+              <Text style={[styles.receiptValue, { color: colors.teal }]}>₹{formattedAmount}</Text>
+            </View>
+            <View style={styles.receiptDivider} />
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptLabel}>DATE & TIME</Text>
+              <Text style={styles.receiptValue}>{formattedDate}</Text>
+            </View>
+          </View>
 
-        {/* ── Support tip ──────────────────────────────── */}
-        <View style={styles.supportTip}>
-          <Info size={16} color={TEAL} />
-          <Text style={styles.supportTipText}>
-            For any queries, please contact our support team.
+          {/* ── Context paragraph ────────────────────────── */}
+          <Text style={styles.contextPara}>
+            This confirms receipt of the advance payment for the project. Once the Work Order is generated, the consultant will review and accept it to begin work.
           </Text>
-        </View>
 
-        {/* ── Generate Work Order button ────────────────── */}
-        {generated ? (
-          <View style={styles.generatedCard}>
-            <CheckCircle size={28} color={TEAL} />
-            <Text style={styles.generatedTitle}>Work Order Generated!</Text>
-            <Text style={styles.generatedSubtitle}>
-              The consultant has been notified to review and accept the Work Order.
+          {/* ── Support tip ──────────────────────────────── */}
+          <View style={styles.supportTip}>
+            <Info size={16} color={colors.teal} />
+            <Text style={styles.supportTipText}>
+              For any queries, please contact our support team.
             </Text>
+          </View>
+
+          {/* ── Generate Work Order button ────────────────── */}
+          {generated ? (
+            <View style={styles.generatedCard}>
+              <CheckCircle size={28} color={colors.success} />
+              <Text style={styles.generatedTitle}>Work Order Generated!</Text>
+              <Text style={styles.generatedSubtitle}>
+                The consultant has been notified to review and accept the Work Order.
+              </Text>
+              <TouchableOpacity
+                style={styles.dashboardBtn}
+                onPress={() => navigation.navigate('Main', { screen: 'Dashboard' })}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.dashboardBtnText}>Go to Dashboard</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
             <TouchableOpacity
-              style={styles.dashboardBtn}
-              onPress={() => navigation.navigate('Main', { screen: 'Dashboard' })}
+              style={[styles.generateBtn, generating && { opacity: 0.6 }]}
+              onPress={handleGenerateWorkOrder}
+              disabled={generating}
               activeOpacity={0.85}
             >
-              <Text style={styles.dashboardBtnText}>Go to Dashboard</Text>
+              {generating
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <Text style={styles.generateBtnText}>Generate Work Order</Text>
+              }
             </TouchableOpacity>
-          </View>
-        ) : (
-          <TouchableOpacity
-            style={[styles.generateBtn, generating && { opacity: 0.6 }]}
-            onPress={handleGenerateWorkOrder}
-            disabled={generating}
-            activeOpacity={0.85}
-          >
-            {generating
-              ? <ActivityIndicator color={NAVY} size="small" />
-              : <Text style={styles.generateBtnText}>Generate{'\n'}Work Order</Text>
-            }
-          </TouchableOpacity>
-        )}
-      </ScrollView>
-
-      {/* Bottom nav */}
-      <View style={styles.bottomBar}>
-        <TouchableOpacity style={styles.bottomBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-          <ArrowLeft size={16} color={colors.textSecondary} />
-          <Text style={styles.bottomBtnLabel}>Back</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.bottomHomeBtn}
-          onPress={() => navigation.navigate('Main', { screen: 'Dashboard' })}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.bottomHomeBtnLabel}>🏠  Home</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.bottomBtn}
-          onPress={() => navigation.navigate('Main', { screen: 'Search' })}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.bottomBtnLabel}>🔍 Search</Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F0F2F8' },
+  bg: { flex: 1, backgroundColor: colors.screenBg },
+  safe: { flex: 1 },
 
-  topRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16,
-  },
-  dIcon: { width: 36, height: 36 },
-  headerTagline: {
-    fontSize: fontSizes.sm, fontFamily: fonts.body,
-    color: colors.textSecondary, flex: 1,
-  },
+  scroll: { paddingHorizontal: spacing.xl, paddingBottom: 100 },
 
-  scroll: { paddingHorizontal: 24, paddingBottom: 24 },
 
   // ── Success header ──────────────────────────────────────────
-  successHeader: { alignItems: 'center', paddingVertical: 28, gap: 12 },
+  successHeader: { alignItems: 'center', paddingVertical: spacing.xl, gap: spacing.md },
   checkCircle: {
     width: 80, height: 80, borderRadius: 40,
-    backgroundColor: TEAL,
+    backgroundColor: colors.teal,
     alignItems: 'center', justifyContent: 'center',
-    ...Platform.select({
-      ios: { shadowColor: TEAL, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12 },
-      android: { elevation: 6 },
-    }),
+    ...shadows.lg,
   },
   confirmedTitle: {
-    fontSize: 28, fontWeight: '800', fontFamily: fonts.heavy,
-    color: NAVY, textAlign: 'center',
+    fontSize: fontSizes['3xl'], fontWeight: '800', fontFamily: fonts.heavy,
+    color: colors.textPrimary, textAlign: 'center',
   },
   confirmedSubtitle: {
     fontSize: fontSizes.base, fontFamily: fonts.body,
@@ -243,66 +202,63 @@ const styles = StyleSheet.create({
 
   // ── Receipt card ────────────────────────────────────────────
   receiptCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
+    backgroundColor: colors.cardBg,
+    borderRadius: radii.xl,
+    padding: spacing.xl,
+    marginBottom: spacing.xl,
     borderWidth: 1,
-    borderColor: '#E0E4EE',
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8 },
-      android: { elevation: 2 },
-    }),
+    borderColor: colors.border,
+    ...shadows.card,
   },
   receiptRow: {
     flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', paddingVertical: 14,
+    alignItems: 'center', paddingVertical: spacing.md + 2,
   },
-  receiptDivider: { height: 1, backgroundColor: '#F0F2F8' },
+  receiptDivider: { height: 1, backgroundColor: colors.borderLight },
   receiptLabel: {
-    fontSize: 11, fontWeight: '700', fontFamily: fonts.heavy,
+    fontSize: fontSizes.xs + 1, fontWeight: '700', fontFamily: fonts.heavy,
     color: colors.textTertiary, letterSpacing: 0.5,
   },
   receiptValue: {
     fontSize: fontSizes.base, fontWeight: '700', fontFamily: fonts.heavy,
-    color: NAVY, maxWidth: '55%', textAlign: 'right',
+    color: colors.textPrimary, maxWidth: '55%', textAlign: 'right',
   },
 
   // ── Context ─────────────────────────────────────────────────
   contextPara: {
-    fontSize: fontSizes.sm, fontFamily: fonts.body,
+    fontSize: fontSizes.sm + 1, fontFamily: fonts.body,
     color: colors.textSecondary, lineHeight: 22,
-    textAlign: 'center', marginBottom: 16,
+    textAlign: 'center', marginBottom: spacing.lg,
   },
 
   // ── Support tip ─────────────────────────────────────────────
   supportTip: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 10,
-    backgroundColor: '#EEF4FF', borderRadius: 12,
-    paddingHorizontal: 16, paddingVertical: 14, marginBottom: 24,
+    flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm + 2,
+    backgroundColor: '#EEF4FF', borderRadius: radii.lg,
+    paddingHorizontal: spacing.lg, paddingVertical: spacing.md + 2,
+    marginBottom: spacing['2xl'],
   },
   supportTipText: {
     flex: 1, fontSize: fontSizes.base, fontFamily: fonts.body,
-    color: TEAL, lineHeight: 22,
+    color: colors.tealDark, lineHeight: 22,
   },
 
   // ── Generate button ─────────────────────────────────────────
   generateBtn: {
-    backgroundColor: '#EAEDF4',
-    borderRadius: 16, paddingVertical: 28,
+    backgroundColor: colors.btnPrimary,
+    borderRadius: radii.xl, paddingVertical: spacing.xl,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: '#CBD2E8',
-    minHeight: 100,
+    minHeight: 56, ...shadows.md,
   },
   generateBtnText: {
-    fontSize: 26, fontStyle: 'italic', fontFamily: fonts.heavy,
-    color: NAVY, textAlign: 'center', lineHeight: 32,
+    fontSize: fontSizes.lg, fontFamily: fonts.heavy,
+    color: '#fff', textAlign: 'center',
   },
 
   // ── Generated state ─────────────────────────────────────────
   generatedCard: {
-    backgroundColor: '#F0FDF4', borderRadius: 16, padding: 24,
-    alignItems: 'center', gap: 10,
+    backgroundColor: '#F0FDF4', borderRadius: radii.xl, padding: spacing['2xl'],
+    alignItems: 'center', gap: spacing.md,
     borderWidth: 1, borderColor: '#86EFAC',
   },
   generatedTitle: {
@@ -313,25 +269,11 @@ const styles = StyleSheet.create({
     textAlign: 'center', lineHeight: 22,
   },
   dashboardBtn: {
-    marginTop: 12, backgroundColor: NAVY, borderRadius: 12,
-    paddingHorizontal: 28, paddingVertical: 14,
+    marginTop: spacing.md, backgroundColor: colors.btnPrimary, borderRadius: radii.lg,
+    paddingHorizontal: spacing['2xl'], paddingVertical: spacing.lg,
   },
   dashboardBtnText: {
     color: '#fff', fontSize: fontSizes.base, fontWeight: '700', fontFamily: fonts.heavy,
   },
-
-  // ── Bottom nav ──────────────────────────────────────────────
-  bottomBar: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingVertical: 12,
-    paddingBottom: Platform.OS === 'ios' ? 28 : 12,
-    backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#E8EAF0',
-  },
-  bottomBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 6 },
-  bottomBtnLabel: { fontSize: 12, fontFamily: fonts.medium, color: colors.textSecondary },
-  bottomHomeBtn: {
-    backgroundColor: NAVY, borderRadius: 10,
-    paddingHorizontal: 18, paddingVertical: 10,
-  },
-  bottomHomeBtnLabel: { color: '#fff', fontSize: 12, fontWeight: '700', fontFamily: fonts.heavy },
 });
+

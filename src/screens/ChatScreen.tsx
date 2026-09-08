@@ -1,10 +1,12 @@
 ﻿import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform, FlatList, KeyboardAvoidingView, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, Send, Paperclip, Check, X } from 'lucide-react-native';
+import { ChevronLeft, Send, Paperclip } from 'lucide-react-native';
 import { useAuthStore } from '../store/useAuthStore';
 import { colors, fonts, fontSizes, spacing, radii, shadows } from '../styles/theme';
-import { acceptBidCandidate, declineBidCandidate } from '../services/bidService';
+import { supabase } from '../lib/supabase';
+import PriceNegotiationCard from '../components/PriceNegotiationCard';
+import { acceptBidCandidate, declineBidCandidate, counterBidPrice, fetchBidCandidateById } from '../services/bidService';
 import {
   fetchMessages as fetchMessagesService,
   sendMessage,
@@ -53,6 +55,8 @@ export default function ChatScreen({ navigation, route }: any) {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [deciding, setDeciding] = useState(false);
+  // Live bid-candidate state (price + who proposed) for the negotiation handshake.
+  const [candidate, setCandidate] = useState<{ id: string; quoted_price: number; offer_by: 'client' | 'consultant'; status: string } | null>(null);
   const listRef = useRef<FlatList<ChatRow>>(null);
 
   useEffect(() => {
@@ -65,6 +69,22 @@ export default function ChatScreen({ navigation, route }: any) {
 
     return () => { unsubscribeFromMessages(channel); };
   }, []);
+
+  // Bid mode: load the candidate's live price/offer state and keep it in sync
+  // (realtime) so both sides see counter-offers as they happen.
+  useEffect(() => {
+    if (!isBidMode || !bidCandidateId) return;
+    let active = true;
+    const loadCandidate = () => {
+      fetchBidCandidateById(bidCandidateId).then(c => { if (active) setCandidate(c as any); });
+    };
+    loadCandidate();
+    const ch = supabase
+      .channel(`bid_candidate:${bidCandidateId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bid_candidates', filter: `id=eq.${bidCandidateId}` }, loadCandidate)
+      .subscribe();
+    return () => { active = false; supabase.removeChannel(ch); };
+  }, [isBidMode, bidCandidateId]);
 
   async function fetchMessages() {
     if (!entityId) { setLoading(false); return; }
@@ -90,14 +110,35 @@ export default function ChatScreen({ navigation, route }: any) {
     finally { setSending(false); }
   }
 
+  // Accept the price on the table (either party). Creates the project at
+  // advance_pending; route each role to their own project surface.
   async function handleAccept() {
     if (!bidCandidateId || deciding) return;
     setDeciding(true);
     try {
       const newProject = await acceptBidCandidate(bidCandidateId);
-      navigation.navigate('Main', { screen: 'CreatorWorkorder', params: { project: newProject } });
+      if (currentRole === 'consultant') {
+        navigation.navigate('Main', { screen: 'CreatorWorkorder', params: { project: newProject } });
+      } else {
+        navigation.navigate('ClientWorkorder', { project: newProject });
+      }
     } catch (e: any) {
-      Alert.alert('Error', e.message ?? 'Could not accept this bid.');
+      Alert.alert('Error', e.message ?? 'Could not accept this offer.');
+    } finally {
+      setDeciding(false);
+    }
+  }
+
+  // Counter with a new price (either party). Stays in negotiation.
+  async function handleCounter(amount: number) {
+    if (!bidCandidateId || !currentRole || deciding) return;
+    setDeciding(true);
+    try {
+      await counterBidPrice(bidCandidateId, amount, currentRole);
+      const c = await fetchBidCandidateById(bidCandidateId);
+      setCandidate(c as any);
+    } catch (e: any) {
+      Alert.alert('Error', e.message ?? 'Could not send counter-offer.');
     } finally {
       setDeciding(false);
     }
@@ -165,9 +206,10 @@ export default function ChatScreen({ navigation, route }: any) {
       ? `${project.assignment_type?.charAt(0).toUpperCase()}${project.assignment_type?.slice(1) || ''}`
       : 'Assignment';
 
-  // Per spec, accept/decline on a negotiation belongs to the consultant —
-  // the client's role here is to discuss, not unilaterally close it out.
-  const showDecisionStrip = isBidMode && currentRole === 'consultant';
+  // Symmetric handshake: whoever is looking at the OTHER party's pending offer
+  // can Accept or Counter; the consultant can additionally pass to the next
+  // candidate. Only while the candidate is still open (pending/negotiating).
+  const showOfferCard = isBidMode && !!candidate && ['pending', 'negotiating'].includes(candidate.status);
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.cardBg }]} edges={['top']}>
@@ -186,26 +228,18 @@ export default function ChatScreen({ navigation, route }: any) {
             <View style={{ width: 36 }} />
           </View>
 
-          {showDecisionStrip && (
-            <View style={styles.decisionStrip}>
-              <TouchableOpacity
-                style={[styles.decisionBtn, styles.declineBtn, deciding && { opacity: 0.6 }]}
-                onPress={handleDecline}
-                disabled={deciding}
-                activeOpacity={0.85}
-              >
-                <X size={15} color="#fff" />
-                <Text style={styles.decisionBtnText}>Decline</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.decisionBtn, styles.acceptBtn, deciding && { opacity: 0.6 }]}
-                onPress={handleAccept}
-                disabled={deciding}
-                activeOpacity={0.85}
-              >
-                {deciding ? <ActivityIndicator size="small" color="#fff" /> : <><Check size={15} color="#fff" /><Text style={styles.decisionBtnText}>Accept</Text></>}
-              </TouchableOpacity>
-            </View>
+          {showOfferCard && (
+            <PriceNegotiationCard
+              amount={candidate!.quoted_price}
+              offerBy={candidate!.offer_by}
+              myRole={(currentRole as 'client' | 'consultant') ?? 'client'}
+              otherName={otherName}
+              busy={deciding}
+              onAccept={handleAccept}
+              onCounter={handleCounter}
+              onDecline={currentRole === 'consultant' ? handleDecline : undefined}
+              declineLabel="Decline & pass to next"
+            />
           )}
 
           {/* Messages */}

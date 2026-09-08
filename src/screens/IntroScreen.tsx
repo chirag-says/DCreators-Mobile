@@ -18,7 +18,7 @@ const { width } = Dimensions.get('window');
 
 // ─── Color tokens (from Figma) ──────────────────────────────
 const CLIENT_BG   = '#E8ECF4';  // muted blue-gray tint for icon zone
-const CONSULT_BG  = '#FDF0E4';  // warm peach tint for icon zone
+const CONSULT_BG  = '#FFF9F2';  // warm peach tint for icon zone (client-specified)
 const CLIENT_PILL = '#1A2560';  // dark navy pill
 const CONSULT_PILL = '#C84B0F'; // burnt orange pill
 
@@ -136,7 +136,7 @@ export default function IntroScreen({ navigation, route }: any) {
           <Text style={styles.footerText}>
             A Joint Venture of{' '}
             <Text style={styles.footerBold}>Ishisoft Pvt.Ltd</Text>,{' '}
-            <Text style={styles.footerBold}>Mr. Shoumik Mazumder</Text> and
+            <Text style={styles.footerBold}>Mr. Shoumik Mazumdar</Text> and
           </Text>
           <Text style={styles.footerText}>
             <Text style={styles.footerBold}>Design &amp; Animation Club</Text>,
