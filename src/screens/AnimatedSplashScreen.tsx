@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, StyleSheet } from 'react-native';
 import { RemoteAssets } from '../lib/assets';
+import { useAuthStore } from '../store/useAuthStore';
 
 
 export default function AnimatedSplashScreen({ navigation }: any) {
@@ -20,12 +21,40 @@ export default function AnimatedSplashScreen({ navigation }: any) {
         useNativeDriver: true,
       }),
     ]).start();
+  }, []);
 
-    const timer = setTimeout(() => {
-      navigation.replace('Welcome');
-    }, 2500);
+  // Wait for auth initialization, then navigate based on session state.
+  // We also enforce a minimum 2.5s splash so the animation plays out.
+  useEffect(() => {
+    const minSplash = new Promise((r) => setTimeout(r, 2500));
 
-    return () => clearTimeout(timer);
+    const unsubscribe = useAuthStore.subscribe((state) => {
+      if (state.isInitialized) {
+        minSplash.then(() => {
+          if (state.user) {
+            navigation.replace('Main');
+          } else {
+            navigation.replace('Welcome');
+          }
+        });
+        unsubscribe();
+      }
+    });
+
+    // If already initialized by the time we subscribe (unlikely but safe)
+    const current = useAuthStore.getState();
+    if (current.isInitialized) {
+      minSplash.then(() => {
+        if (current.user) {
+          navigation.replace('Main');
+        } else {
+          navigation.replace('Welcome');
+        }
+      });
+      unsubscribe();
+    }
+
+    return () => unsubscribe();
   }, []);
 
   return (
@@ -57,3 +86,4 @@ const styles = StyleSheet.create({
     height: 130,
   },
 });
+
